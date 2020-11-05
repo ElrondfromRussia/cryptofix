@@ -77,9 +77,17 @@ func TestCTR_AES(t *testing.T) {
 
 		for j := 0; j <= 5; j += 5 {
 			in := tt.in[0 : len(tt.in)-j]
-			ctr := cipher.NewCTR(c, tt.iv)
+			ctr, err := cipher.NewCTR(c, tt.iv)
+			if err != nil {
+				t.Error("bad NewCTR", err)
+				continue
+			}
 			encrypted := make([]byte, len(in))
-			ctr.XORKeyStream(encrypted, in)
+			err = ctr.XORKeyStream(encrypted, in)
+			if err != nil {
+				t.Errorf("bad TestCTR_AES1: %s: NewCipher(%d bytes) = %s", test, len(tt.key), err)
+				continue
+			}
 			if out := tt.out[0:len(in)]; !bytes.Equal(out, encrypted) {
 				t.Errorf("%s/%d: CTR\ninpt %x\nhave %x\nwant %x", test, len(in), in, encrypted, out)
 			}
@@ -87,9 +95,17 @@ func TestCTR_AES(t *testing.T) {
 
 		for j := 0; j <= 7; j += 7 {
 			in := tt.out[0 : len(tt.out)-j]
-			ctr := cipher.NewCTR(c, tt.iv)
+			ctr, err := cipher.NewCTR(c, tt.iv)
+			if err != nil {
+				t.Error("bad NewCTR", err)
+				continue
+			}
 			plain := make([]byte, len(in))
-			ctr.XORKeyStream(plain, in)
+			err = ctr.XORKeyStream(plain, in)
+			if err != nil {
+				t.Errorf("bad TestCTR_AES2: %s: NewCipher(%d bytes) = %s", test, len(tt.key), err)
+				continue
+			}
 			if out := tt.in[0:len(in)]; !bytes.Equal(out, plain) {
 				t.Errorf("%s/%d: CTRReader\nhave %x\nwant %x", test, len(out), plain, out)
 			}

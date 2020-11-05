@@ -6,7 +6,10 @@
 
 package cipher
 
-import "github.com/ElrondfromRussia/cryptofix/internal/subtle"
+import (
+	"errors"
+	"github.com/ElrondfromRussia/cryptofix/internal/subtle"
+)
 
 type ofb struct {
 	b       Block
@@ -18,10 +21,10 @@ type ofb struct {
 // NewOFB returns a Stream that encrypts or decrypts using the block cipher b
 // in output feedback mode. The initialization vector iv's length must be equal
 // to b's block size.
-func NewOFB(b Block, iv []byte) Stream {
+func NewOFB(b Block, iv []byte) (Stream, error) {
 	blockSize := b.BlockSize()
 	if len(iv) != blockSize {
-		panic("cipher.NewOFB: IV length must equal block size")
+		return nil, errors.New("cipher.NewOFB: IV length must equal block size")
 	}
 	bufSize := streamBufferSize
 	if bufSize < blockSize {
@@ -35,7 +38,7 @@ func NewOFB(b Block, iv []byte) Stream {
 	}
 
 	copy(x.cipher, iv)
-	return x
+	return x, nil
 }
 
 func (x *ofb) refill() {
@@ -47,7 +50,10 @@ func (x *ofb) refill() {
 	copy(x.out, x.out[x.outUsed:])
 	x.out = x.out[:cap(x.out)]
 	for remain < len(x.out)-bs {
-		x.b.Encrypt(x.cipher, x.cipher)
+		err := x.b.Encrypt(x.cipher, x.cipher)
+		if err != nil {
+			return
+		}
 		copy(x.out[remain:], x.cipher)
 		remain += bs
 	}
@@ -55,12 +61,12 @@ func (x *ofb) refill() {
 	x.outUsed = 0
 }
 
-func (x *ofb) XORKeyStream(dst, src []byte) {
+func (x *ofb) XORKeyStream(dst, src []byte) error {
 	if len(dst) < len(src) {
-		panic("crypto/cipher: output smaller than input")
+		return errors.New("crypto/cipher-output smaller than input")
 	}
 	if subtle.InexactOverlap(dst[:len(src)], src) {
-		panic("crypto/cipher: invalid buffer overlap")
+		return errors.New("crypto/cipher-invalid buffer overlap")
 	}
 	for len(src) > 0 {
 		if x.outUsed >= len(x.out)-x.b.BlockSize() {
@@ -71,4 +77,5 @@ func (x *ofb) XORKeyStream(dst, src []byte) {
 		src = src[n:]
 		x.outUsed += n
 	}
+	return nil
 }

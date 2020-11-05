@@ -287,7 +287,10 @@ func TestCipherEncrypt(t *testing.T) {
 			continue
 		}
 		out := make([]byte, len(tt.in))
-		c.Encrypt(out, tt.in)
+		err = c.Encrypt(out, tt.in)
+		if err != nil {
+			t.Error("dab Cipher Encrypt")
+		}
 		for j, v := range out {
 			if v != tt.out[j] {
 				t.Errorf("Cipher.Encrypt %d: out[%d] = %#x, want %#x", i, j, v, tt.out[j])
@@ -306,7 +309,10 @@ func TestCipherDecrypt(t *testing.T) {
 			continue
 		}
 		plain := make([]byte, len(tt.in))
-		c.Decrypt(plain, tt.out)
+		err = c.Decrypt(plain, tt.out)
+		if err != nil {
+			t.Error("dab Cipher Decrypt")
+		}
 		for j, v := range plain {
 			if v != tt.in[j] {
 				t.Errorf("decryptBlock %d: plain[%d] = %#x, want %#x", i, j, v, tt.in[j])
@@ -324,12 +330,30 @@ func TestShortBlocks(t *testing.T) {
 
 	c, _ := NewCipher(bytes(16))
 
-	mustPanic(t, "crypto/aes: input not full block", func() { c.Encrypt(bytes(1), bytes(1)) })
-	mustPanic(t, "crypto/aes: input not full block", func() { c.Decrypt(bytes(1), bytes(1)) })
-	mustPanic(t, "crypto/aes: input not full block", func() { c.Encrypt(bytes(100), bytes(1)) })
-	mustPanic(t, "crypto/aes: input not full block", func() { c.Decrypt(bytes(100), bytes(1)) })
-	mustPanic(t, "crypto/aes: output not full block", func() { c.Encrypt(bytes(1), bytes(100)) })
-	mustPanic(t, "crypto/aes: output not full block", func() { c.Decrypt(bytes(1), bytes(100)) })
+	err := c.Encrypt(bytes(1), bytes(1))
+	if err != nil {
+		t.Error("bad TestShortBlocks1")
+	}
+	err = c.Decrypt(bytes(1), bytes(1))
+	if err != nil {
+		t.Error("bad TestShortBlocks2")
+	}
+	err = c.Encrypt(bytes(100), bytes(1))
+	if err != nil {
+		t.Error("bad TestShortBlocks3")
+	}
+	err = c.Decrypt(bytes(100), bytes(1))
+	if err != nil {
+		t.Error("bad TestShortBlocks4")
+	}
+	err = c.Encrypt(bytes(1), bytes(100))
+	if err != nil {
+		t.Error("bad TestShortBlocks5")
+	}
+	err = c.Decrypt(bytes(1), bytes(100))
+	if err != nil {
+		t.Error("bad TestShortBlocks6")
+	}
 }
 
 func mustPanic(t *testing.T, msg string, f func()) {
@@ -354,7 +378,10 @@ func BenchmarkEncrypt(b *testing.B) {
 	b.SetBytes(int64(len(out)))
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		c.Encrypt(out, tt.in)
+		err = c.Encrypt(out, tt.in)
+		if err != nil {
+			b.Fatal("dab Cipher BenchmarkEncrypt")
+		}
 	}
 }
 
@@ -368,7 +395,10 @@ func BenchmarkDecrypt(b *testing.B) {
 	b.SetBytes(int64(len(out)))
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		c.Decrypt(out, tt.out)
+		err = c.Decrypt(out, tt.in)
+		if err != nil {
+			b.Fatal("dab Cipher BenchmarkDecrypt")
+		}
 	}
 }
 

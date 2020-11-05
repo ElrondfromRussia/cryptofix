@@ -6,7 +6,10 @@
 
 package cipher
 
-import "github.com/ElrondfromRussia/cryptofix/internal/subtle"
+import (
+	"errors"
+	"github.com/ElrondfromRussia/cryptofix/internal/subtle"
+)
 
 type cfb struct {
 	b       Block
@@ -17,16 +20,19 @@ type cfb struct {
 	decrypt bool
 }
 
-func (x *cfb) XORKeyStream(dst, src []byte) {
+func (x *cfb) XORKeyStream(dst, src []byte) error {
 	if len(dst) < len(src) {
-		panic("crypto/cipher: output smaller than input")
+		return errors.New("crypto/cipher-output smaller than input")
 	}
 	if subtle.InexactOverlap(dst[:len(src)], src) {
-		panic("crypto/cipher: invalid buffer overlap")
+		return errors.New("crypto/cipher-invalid buffer overlap")
 	}
 	for len(src) > 0 {
 		if x.outUsed == len(x.out) {
-			x.b.Encrypt(x.out, x.next)
+			err := x.b.Encrypt(x.out, x.next)
+			if err != nil {
+				return errors.New("crypto/cipher-bad XORKeyStream")
+			}
 			x.outUsed = 0
 		}
 
@@ -45,27 +51,28 @@ func (x *cfb) XORKeyStream(dst, src []byte) {
 		src = src[n:]
 		x.outUsed += n
 	}
+	return nil
 }
 
 // NewCFBEncrypter returns a Stream which encrypts with cipher feedback mode,
 // using the given Block. The iv must be the same length as the Block's block
 // size.
-func NewCFBEncrypter(block Block, iv []byte) Stream {
+func NewCFBEncrypter(block Block, iv []byte) (Stream, error) {
 	return newCFB(block, iv, false)
 }
 
 // NewCFBDecrypter returns a Stream which decrypts with cipher feedback mode,
 // using the given Block. The iv must be the same length as the Block's block
 // size.
-func NewCFBDecrypter(block Block, iv []byte) Stream {
+func NewCFBDecrypter(block Block, iv []byte) (Stream, error) {
 	return newCFB(block, iv, true)
 }
 
-func newCFB(block Block, iv []byte, decrypt bool) Stream {
+func newCFB(block Block, iv []byte, decrypt bool) (Stream, error) {
 	blockSize := block.BlockSize()
 	if len(iv) != blockSize {
 		// stack trace will indicate whether it was de or encryption
-		panic("cipher.newCFB: IV length must equal block size")
+		return nil, errors.New("cipher.newCFB: IV length must equal block size")
 	}
 	x := &cfb{
 		b:       block,
@@ -76,5 +83,5 @@ func newCFB(block Block, iv []byte, decrypt bool) Stream {
 	}
 	copy(x.next, iv)
 
-	return x
+	return x, nil
 }

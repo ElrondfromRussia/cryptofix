@@ -70,16 +70,28 @@ func TestCFBVectors(t *testing.T) {
 		}
 
 		ciphertext := make([]byte, len(plaintext))
-		cfb := cipher.NewCFBEncrypter(block, iv)
-		cfb.XORKeyStream(ciphertext, plaintext)
+		cfb, err := cipher.NewCFBEncrypter(block, iv)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = cfb.XORKeyStream(ciphertext, plaintext)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		if !bytes.Equal(ciphertext, expected) {
 			t.Errorf("#%d: wrong output: got %x, expected %x", i, ciphertext, expected)
 		}
 
-		cfbdec := cipher.NewCFBDecrypter(block, iv)
+		cfbdec, err := cipher.NewCFBDecrypter(block, iv)
+		if err != nil {
+			t.Fatal(err)
+		}
 		plaintextCopy := make([]byte, len(ciphertext))
-		cfbdec.XORKeyStream(plaintextCopy, ciphertext)
+		err = cfbdec.XORKeyStream(plaintextCopy, ciphertext)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		if !bytes.Equal(plaintextCopy, plaintext) {
 			t.Errorf("#%d: wrong plaintext: got %x, expected %x", i, plaintextCopy, plaintext)
@@ -96,16 +108,31 @@ func TestCFBInverse(t *testing.T) {
 
 	plaintext := []byte("this is the plaintext. this is the plaintext.")
 	iv := make([]byte, block.BlockSize())
-	rand.Reader.Read(iv)
-	cfb := cipher.NewCFBEncrypter(block, iv)
+	_, err = rand.Reader.Read(iv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfb, err := cipher.NewCFBEncrypter(block, iv)
+	if err != nil {
+		t.Fatal(err)
+	}
 	ciphertext := make([]byte, len(plaintext))
 	copy(ciphertext, plaintext)
-	cfb.XORKeyStream(ciphertext, ciphertext)
+	err = cfb.XORKeyStream(ciphertext, ciphertext)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	cfbdec := cipher.NewCFBDecrypter(block, iv)
+	cfbdec, err := cipher.NewCFBDecrypter(block, iv)
+	if err != nil {
+		t.Fatal(err)
+	}
 	plaintextCopy := make([]byte, len(plaintext))
 	copy(plaintextCopy, ciphertext)
-	cfbdec.XORKeyStream(plaintextCopy, plaintextCopy)
+	err = cfbdec.XORKeyStream(plaintextCopy, plaintextCopy)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if !bytes.Equal(plaintextCopy, plaintext) {
 		t.Errorf("got: %x, want: %x", plaintextCopy, plaintext)

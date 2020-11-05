@@ -125,7 +125,10 @@ func newGCMWithNonceAndTagSize(cipher Block, nonceSize, tagSize int) (AEAD, erro
 	}
 
 	var key [gcmBlockSize]byte
-	cipher.Encrypt(key[:], key[:])
+	err := cipher.Encrypt(key[:], key[:])
+	if err != nil {
+		return nil, errors.New("cipher: NewGCM bad Encrypt")
+	}
 
 	g := &gcm{cipher: cipher, nonceSize: nonceSize, tagSize: tagSize}
 
@@ -179,10 +182,16 @@ func (g *gcm) Seal(dst, nonce, plaintext, data []byte) ([]byte, error) {
 	var counter, tagMask [gcmBlockSize]byte
 	g.deriveCounter(&counter, nonce)
 
-	g.cipher.Encrypt(tagMask[:], counter[:])
+	err := g.cipher.Encrypt(tagMask[:], counter[:])
+	if err != nil {
+		return nil, errors.New("cipher: bad g.cipher.Encrypt in Seal")
+	}
 	gcmInc32(&counter)
 
-	g.counterCrypt(out, plaintext, &counter)
+	err = g.counterCrypt(out, plaintext, &counter)
+	if err != nil {
+		return nil, errors.New("cipher: bad g.counterCrypt in Seal")
+	}
 
 	var tag [gcmTagSize]byte
 	g.auth(tag[:], out[:len(plaintext)], data, &tagMask)
@@ -216,7 +225,10 @@ func (g *gcm) Open(dst, nonce, ciphertext, data []byte) ([]byte, error) {
 	var counter, tagMask [gcmBlockSize]byte
 	g.deriveCounter(&counter, nonce)
 
-	g.cipher.Encrypt(tagMask[:], counter[:])
+	err := g.cipher.Encrypt(tagMask[:], counter[:])
+	if err != nil {
+		return nil, errors.New("cipher: bad g.cipher.Encrypt in Open")
+	}
 	gcmInc32(&counter)
 
 	var expectedTag [gcmTagSize]byte
@@ -238,7 +250,10 @@ func (g *gcm) Open(dst, nonce, ciphertext, data []byte) ([]byte, error) {
 		return nil, errOpen
 	}
 
-	g.counterCrypt(out, ciphertext, &counter)
+	err = g.counterCrypt(out, ciphertext, &counter)
+	if err != nil {
+		return nil, errors.New("cipher: bad g.counterCrypt in Open")
+	}
 
 	return ret, nil
 }
@@ -364,11 +379,14 @@ func sliceForAppend(in []byte, n int) (head, tail []byte) {
 }
 
 // counterCrypt crypts in to out using g.cipher in counter mode.
-func (g *gcm) counterCrypt(out, in []byte, counter *[gcmBlockSize]byte) {
+func (g *gcm) counterCrypt(out, in []byte, counter *[gcmBlockSize]byte) error {
 	var mask [gcmBlockSize]byte
 
 	for len(in) >= gcmBlockSize {
-		g.cipher.Encrypt(mask[:], counter[:])
+		err := g.cipher.Encrypt(mask[:], counter[:])
+		if err != nil {
+			return errors.New("cipher: bad g.cipher.Encrypt in counterCrypt1")
+		}
 		gcmInc32(counter)
 
 		xorWords(out, in, mask[:])
@@ -377,10 +395,14 @@ func (g *gcm) counterCrypt(out, in []byte, counter *[gcmBlockSize]byte) {
 	}
 
 	if len(in) > 0 {
-		g.cipher.Encrypt(mask[:], counter[:])
+		err := g.cipher.Encrypt(mask[:], counter[:])
+		if err != nil {
+			return errors.New("cipher: bad g.cipher.Encrypt in counterCrypt2")
+		}
 		gcmInc32(counter)
 		xorBytes(out, in, mask[:])
 	}
+	return nil
 }
 
 // deriveCounter computes the initial GCM counter state from the given nonce.

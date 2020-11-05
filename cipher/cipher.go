@@ -37,7 +37,7 @@ type Stream interface {
 	// Multiple calls to XORKeyStream behave as if the concatenation of
 	// the src buffers was passed in a single run. That is, Stream
 	// maintains state and does not reset at each XORKeyStream call.
-	XORKeyStream(dst, src []byte)
+	XORKeyStream(dst, src []byte) error
 }
 
 // A BlockMode represents a block cipher running in a block-based mode (CBC,
@@ -57,7 +57,7 @@ type BlockMode interface {
 	// Multiple calls to CryptBlocks behave as if the concatenation of
 	// the src buffers was passed in a single run. That is, BlockMode
 	// maintains state and does not reset at each CryptBlocks call.
-	CryptBlocks(dst, src []byte)
+	CryptBlocks(dst, src []byte) error
 }
 
 // Utility routines

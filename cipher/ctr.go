@@ -12,7 +12,10 @@
 
 package cipher
 
-import "github.com/ElrondfromRussia/cryptofix/internal/subtle"
+import (
+	"errors"
+	"github.com/ElrondfromRussia/cryptofix/internal/subtle"
+)
 
 type ctr struct {
 	b       Block
@@ -32,12 +35,12 @@ type ctrAble interface {
 
 // NewCTR returns a Stream which encrypts/decrypts using the given Block in
 // counter mode. The length of iv must be the same as the Block's block size.
-func NewCTR(block Block, iv []byte) Stream {
+func NewCTR(block Block, iv []byte) (Stream, error) {
 	if ctr, ok := block.(ctrAble); ok {
-		return ctr.NewCTR(iv)
+		return ctr.NewCTR(iv), nil
 	}
 	if len(iv) != block.BlockSize() {
-		panic("cipher.NewCTR: IV length must equal block size")
+		return nil, errors.New("cipher.NewCTR: IV length must equal block size")
 	}
 	bufSize := streamBufferSize
 	if bufSize < block.BlockSize() {
@@ -48,16 +51,19 @@ func NewCTR(block Block, iv []byte) Stream {
 		ctr:     dup(iv),
 		out:     make([]byte, 0, bufSize),
 		outUsed: 0,
-	}
+	}, nil
 }
 
-func (x *ctr) refill() {
+func (x *ctr) refill() error {
 	remain := len(x.out) - x.outUsed
 	copy(x.out, x.out[x.outUsed:])
 	x.out = x.out[:cap(x.out)]
 	bs := x.b.BlockSize()
 	for remain <= len(x.out)-bs {
-		x.b.Encrypt(x.out[remain:], x.ctr)
+		err := x.b.Encrypt(x.out[remain:], x.ctr)
+		if err != nil {
+			return err
+		}
 		remain += bs
 
 		// Increment counter
@@ -70,22 +76,27 @@ func (x *ctr) refill() {
 	}
 	x.out = x.out[:remain]
 	x.outUsed = 0
+	return nil
 }
 
-func (x *ctr) XORKeyStream(dst, src []byte) {
+func (x *ctr) XORKeyStream(dst, src []byte) error {
 	if len(dst) < len(src) {
-		panic("crypto/cipher: output smaller than input")
+		return errors.New("crypto/cipher-output smaller than input")
 	}
 	if subtle.InexactOverlap(dst[:len(src)], src) {
-		panic("crypto/cipher: invalid buffer overlap")
+		return errors.New("crypto/cipher-invalid buffer overlap")
 	}
 	for len(src) > 0 {
 		if x.outUsed >= len(x.out)-x.b.BlockSize() {
-			x.refill()
+			err := x.refill()
+			if err != nil {
+				return err
+			}
 		}
 		n := xorBytes(dst, src, x.out[x.outUsed:])
 		dst = dst[n:]
 		src = src[n:]
 		x.outUsed += n
 	}
+	return nil
 }

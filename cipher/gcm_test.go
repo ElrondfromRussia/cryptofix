@@ -222,7 +222,7 @@ var aesGCMTests = []struct {
 func TestAESGCM(t *testing.T) {
 	for i, test := range aesGCMTests {
 		key, _ := hex.DecodeString(test.key)
-		aes, err := aes.NewCipher(key)
+		aesP, err := aes.NewCipher(key)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -236,26 +236,30 @@ func TestAESGCM(t *testing.T) {
 		switch {
 		// Handle non-standard nonce sizes
 		case tagSize != 16:
-			aesgcm, err = cipher.NewGCMWithTagSize(aes, tagSize)
+			aesgcm, err = cipher.NewGCMWithTagSize(aesP, tagSize)
 			if err != nil {
 				t.Fatal(err)
 			}
 
 		// Handle non-standard tag sizes
 		case len(nonce) != 12:
-			aesgcm, err = cipher.NewGCMWithNonceSize(aes, len(nonce))
+			aesgcm, err = cipher.NewGCMWithNonceSize(aesP, len(nonce))
 			if err != nil {
 				t.Fatal(err)
 			}
 
 		default:
-			aesgcm, err = cipher.NewGCM(aes)
+			aesgcm, err = cipher.NewGCM(aesP)
 			if err != nil {
 				t.Fatal(err)
 			}
 		}
 
-		ct := aesgcm.Seal(nil, nonce, plaintext, ad)
+		ct, err := aesgcm.Seal(nil, nonce, plaintext, ad)
+		if err != nil {
+			t.Error("bad test")
+			continue
+		}
 		if ctHex := hex.EncodeToString(ct); ctHex != test.result {
 			t.Errorf("#%d: got %s, want %s", i, ctHex, test.result)
 			continue
@@ -297,10 +301,10 @@ func TestAESGCM(t *testing.T) {
 func TestGCMInvalidTagSize(t *testing.T) {
 	key, _ := hex.DecodeString("ab72c77b97cb5fe9a382d9fe81ffdbed")
 
-	aes, _ := aes.NewCipher(key)
+	aesP, _ := aes.NewCipher(key)
 
-	for _, tagSize := range []int{0, 1, aes.BlockSize() + 1} {
-		aesgcm, err := cipher.NewGCMWithTagSize(aes, tagSize)
+	for _, tagSize := range []int{0, 1, aesP.BlockSize() + 1} {
+		aesgcm, err := cipher.NewGCMWithTagSize(aesP, tagSize)
 		if aesgcm != nil || err == nil {
 			t.Fatalf("NewGCMWithNonceAndTagSize was successful with an invalid %d-byte tag size", tagSize)
 		}
@@ -317,8 +321,8 @@ func TestTagFailureOverwrite(t *testing.T) {
 	nonce, _ := hex.DecodeString("54cc7dc2c37ec006bcc6d1db")
 	ciphertext, _ := hex.DecodeString("0e1bde206a07a9c2c1b65300f8c649972b4401346697138c7a4891ee59867d0c")
 
-	aes, _ := aes.NewCipher(key)
-	aesgcm, _ := cipher.NewGCM(aes)
+	aesP, _ := aes.NewCipher(key)
+	aesgcm, _ := cipher.NewGCM(aesP)
 
 	dst := make([]byte, len(ciphertext)-16)
 	for i := range dst {
@@ -366,7 +370,10 @@ func TestGCMCounterWrap(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		got := aead.Seal(nil, nonce, plaintext, nil)
+		got, err := aead.Seal(nil, nonce, plaintext, nil)
+		if err != nil {
+			t.Errorf("bad Seal test")
+		}
 		if !bytes.Equal(got[len(plaintext):], want) {
 			t.Errorf("test[%v]: got: %x, want: %x", i, got[len(plaintext):], want)
 		}
@@ -383,9 +390,9 @@ type wrapper struct {
 	block cipher.Block
 }
 
-func (w *wrapper) BlockSize() int          { return w.block.BlockSize() }
-func (w *wrapper) Encrypt(dst, src []byte) { w.block.Encrypt(dst, src) }
-func (w *wrapper) Decrypt(dst, src []byte) { w.block.Decrypt(dst, src) }
+func (w *wrapper) BlockSize() int                { return w.block.BlockSize() }
+func (w *wrapper) Encrypt(dst, src []byte) error { return w.block.Encrypt(dst, src) }
+func (w *wrapper) Decrypt(dst, src []byte) error { return w.block.Decrypt(dst, src) }
 
 // wrap wraps the Block interface so that it does not fulfill
 // any optimizing interfaces such as gcmAble.
@@ -461,8 +468,14 @@ func TestGCMAsm(t *testing.T) {
 		if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 			return err
 		}
-		want := generic.Seal(nil, nonce, pt, ad)
-		got := asm.Seal(nil, nonce, pt, ad)
+		want, err := generic.Seal(nil, nonce, pt, ad)
+		if err != nil {
+			return errors.New("incorrect Seal output")
+		}
+		got, err := asm.Seal(nil, nonce, pt, ad)
+		if err != nil {
+			return errors.New("incorrect Seal output")
+		}
 		if !bytes.Equal(want, got) {
 			return errors.New("incorrect Seal output")
 		}

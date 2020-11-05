@@ -15,42 +15,54 @@ func benchmarkAESGCMSign(b *testing.B, buf []byte) {
 
 	var key [16]byte
 	var nonce [12]byte
-	aes, _ := aes.NewCipher(key[:])
-	aesgcm, _ := cipher.NewGCM(aes)
+	aesP, _ := aes.NewCipher(key[:])
+	aesgcm, _ := cipher.NewGCM(aesP)
 	var out []byte
+	var err error
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		out = aesgcm.Seal(out[:0], nonce[:], nil, buf)
+		out, err = aesgcm.Seal(out[:0], nonce[:], nil, buf)
+		if err != nil {
+			b.Fatal("bad benchmarkAESGCMSign:", err)
+		}
 	}
 }
 
 func benchmarkAESGCMSeal(b *testing.B, buf []byte) {
 	b.SetBytes(int64(len(buf)))
 
+	var err error
 	var key [16]byte
 	var nonce [12]byte
 	var ad [13]byte
-	aes, _ := aes.NewCipher(key[:])
-	aesgcm, _ := cipher.NewGCM(aes)
+	aesP, _ := aes.NewCipher(key[:])
+	aesgcm, _ := cipher.NewGCM(aesP)
 	var out []byte
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		out = aesgcm.Seal(out[:0], nonce[:], buf, ad[:])
+		out, err = aesgcm.Seal(out[:0], nonce[:], buf, ad[:])
+		if err != nil {
+			b.Fatal("bad benchmarkAESGCMSeal:", err)
+		}
 	}
 }
 
 func benchmarkAESGCMOpen(b *testing.B, buf []byte) {
 	b.SetBytes(int64(len(buf)))
 
+	var err error
 	var key [16]byte
 	var nonce [12]byte
 	var ad [13]byte
-	aes, _ := aes.NewCipher(key[:])
-	aesgcm, _ := cipher.NewGCM(aes)
+	aesP, _ := aes.NewCipher(key[:])
+	aesgcm, _ := cipher.NewGCM(aesP)
 	var out []byte
-	out = aesgcm.Seal(out[:0], nonce[:], buf, ad[:])
+	out, err = aesgcm.Seal(out[:0], nonce[:], buf, ad[:])
+	if err != nil {
+		b.Fatal("bad benchmarkAESGCMOpen:", err)
+	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -81,17 +93,23 @@ func BenchmarkAESGCMOpen8K(b *testing.B) {
 	benchmarkAESGCMOpen(b, make([]byte, 8*1024))
 }
 
-func benchmarkAESStream(b *testing.B, mode func(cipher.Block, []byte) cipher.Stream, buf []byte) {
+func benchmarkAESStream(b *testing.B, mode func(cipher.Block, []byte) (cipher.Stream, error), buf []byte) {
 	b.SetBytes(int64(len(buf)))
 
 	var key [16]byte
 	var iv [16]byte
-	aes, _ := aes.NewCipher(key[:])
-	stream := mode(aes, iv[:])
+	aesP, _ := aes.NewCipher(key[:])
+	stream, err := mode(aesP, iv[:])
+	if err != nil {
+		b.Fatal("bad NewCipher benchmarkAESStream:", err)
+	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		stream.XORKeyStream(buf, buf)
+		err := stream.XORKeyStream(buf, buf)
+		if err != nil {
+			b.Fatal("bad NewCipher benchmarkAESStream:", err)
+		}
 	}
 }
 
@@ -132,10 +150,16 @@ func BenchmarkAESCBCEncrypt1K(b *testing.B) {
 
 	var key [16]byte
 	var iv [16]byte
-	aes, _ := aes.NewCipher(key[:])
-	cbc := cipher.NewCBCEncrypter(aes, iv[:])
+	aesP, _ := aes.NewCipher(key[:])
+	cbc, err := cipher.NewCBCEncrypter(aesP, iv[:])
+	if err != nil {
+		b.Fatal("bad BenchmarkAESCBCEncrypt1K1:", err)
+	}
 	for i := 0; i < b.N; i++ {
-		cbc.CryptBlocks(buf, buf)
+		err := cbc.CryptBlocks(buf, buf)
+		if err != nil {
+			b.Fatal("bad BenchmarkAESCBCEncrypt1K2:", err)
+		}
 	}
 }
 
@@ -145,9 +169,15 @@ func BenchmarkAESCBCDecrypt1K(b *testing.B) {
 
 	var key [16]byte
 	var iv [16]byte
-	aes, _ := aes.NewCipher(key[:])
-	cbc := cipher.NewCBCDecrypter(aes, iv[:])
+	aesP, _ := aes.NewCipher(key[:])
+	cbc, err := cipher.NewCBCDecrypter(aesP, iv[:])
+	if err != nil {
+		b.Fatal("bad BenchmarkAESCBCDecrypt1K1:", err)
+	}
 	for i := 0; i < b.N; i++ {
-		cbc.CryptBlocks(buf, buf)
+		err := cbc.CryptBlocks(buf, buf)
+		if err != nil {
+			b.Fatal("bad BenchmarkAESCBCDecrypt1K2:", err)
+		}
 	}
 }

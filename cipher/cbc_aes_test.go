@@ -71,12 +71,20 @@ func TestCBCEncrypterAES(t *testing.T) {
 			continue
 		}
 
-		encrypter := cipher.NewCBCEncrypter(c, test.iv)
+		encrypter, err := cipher.NewCBCEncrypter(c, test.iv)
+		if err != nil {
+			t.Error("NewCBCEncrypter:", err)
+			continue
+		}
 
 		data := make([]byte, len(test.in))
 		copy(data, test.in)
 
-		encrypter.CryptBlocks(data, data)
+		err = encrypter.CryptBlocks(data, data)
+		if err != nil {
+			t.Error("CryptBlocks:", err)
+			continue
+		}
 		if !bytes.Equal(test.out, data) {
 			t.Errorf("%s: CBCEncrypter\nhave %x\nwant %x", test.name, data, test.out)
 		}
@@ -91,12 +99,20 @@ func TestCBCDecrypterAES(t *testing.T) {
 			continue
 		}
 
-		decrypter := cipher.NewCBCDecrypter(c, test.iv)
+		decrypter, err := cipher.NewCBCDecrypter(c, test.iv)
+		if err != nil {
+			t.Error("NewCBCDecrypter:", err)
+			continue
+		}
 
 		data := make([]byte, len(test.out))
 		copy(data, test.out)
 
-		decrypter.CryptBlocks(data, data)
+		err = decrypter.CryptBlocks(data, data)
+		if err != nil {
+			t.Error("CryptBlocks:", err)
+			continue
+		}
 		if !bytes.Equal(test.in, data) {
 			t.Errorf("%s: CBCDecrypter\nhave %x\nwant %x", test.name, data, test.in)
 		}

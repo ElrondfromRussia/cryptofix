@@ -201,17 +201,17 @@ func (g *gcmAsm) auth(out, ciphertext, additionalData []byte, tagMask *[gcmTagSi
 
 // Seal encrypts and authenticates plaintext. See the cipher.AEAD interface for
 // details.
-func (g *gcmAsm) Seal(dst, nonce, plaintext, data []byte) []byte {
+func (g *gcmAsm) Seal(dst, nonce, plaintext, data []byte) ([]byte, error) {
 	if len(nonce) != g.nonceSize {
-		panic("crypto/cipher: incorrect nonce length given to GCM")
+		return errors.New("crypto/cipher-incorrect nonce length given to GCM")
 	}
 	if uint64(len(plaintext)) > ((1<<32)-2)*BlockSize {
-		panic("crypto/cipher: message too large for GCM")
+		return errors.New("crypto/cipher-message too large for GCM")
 	}
 
 	ret, out := sliceForAppend(dst, len(plaintext)+g.tagSize)
 	if subtleoverlap.InexactOverlap(out[:len(plaintext)], plaintext) {
-		panic("crypto/cipher: invalid buffer overlap")
+		return errors.New("crypto/cipher-invalid buffer overlap")
 	}
 
 	counter := g.deriveCounter(nonce)
@@ -232,12 +232,12 @@ func (g *gcmAsm) Seal(dst, nonce, plaintext, data []byte) []byte {
 // for details.
 func (g *gcmAsm) Open(dst, nonce, ciphertext, data []byte) ([]byte, error) {
 	if len(nonce) != g.nonceSize {
-		panic("crypto/cipher: incorrect nonce length given to GCM")
+		return errors.New("crypto/cipher-incorrect nonce length given to GCM")
 	}
 	// Sanity check to prevent the authentication from always succeeding if an implementation
 	// leaves tagSize uninitialized, for example.
 	if g.tagSize < gcmMinimumTagSize {
-		panic("crypto/cipher: incorrect GCM tag size")
+		return errors.New("crypto/cipher-incorrect GCM tag size")
 	}
 	if len(ciphertext) < g.tagSize {
 		return nil, errOpen
@@ -260,7 +260,7 @@ func (g *gcmAsm) Open(dst, nonce, ciphertext, data []byte) ([]byte, error) {
 
 	ret, out := sliceForAppend(dst, len(ciphertext))
 	if subtleoverlap.InexactOverlap(out, ciphertext) {
-		panic("crypto/cipher: invalid buffer overlap")
+		return errors.New("crypto/cipher-invalid buffer overlap")
 	}
 
 	if subtle.ConstantTimeCompare(expectedTag[:g.tagSize], tag) != 1 {
@@ -301,17 +301,17 @@ func kmaGCM(fn code, key, dst, src, aad []byte, tag *[16]byte, cnt *gcmCount)
 
 // Seal encrypts and authenticates plaintext. See the cipher.AEAD interface for
 // details.
-func (g *gcmKMA) Seal(dst, nonce, plaintext, data []byte) []byte {
+func (g *gcmKMA) Seal(dst, nonce, plaintext, data []byte) ([]byte, error) {
 	if len(nonce) != g.nonceSize {
-		panic("crypto/cipher: incorrect nonce length given to GCM")
+		return errors.New("crypto/cipher-incorrect nonce length given to GCM")
 	}
 	if uint64(len(plaintext)) > ((1<<32)-2)*BlockSize {
-		panic("crypto/cipher: message too large for GCM")
+		return errors.New("crypto/cipher-message too large for GCM")
 	}
 
 	ret, out := sliceForAppend(dst, len(plaintext)+g.tagSize)
 	if subtleoverlap.InexactOverlap(out[:len(plaintext)], plaintext) {
-		panic("crypto/cipher: invalid buffer overlap")
+		return errors.New("crypto/cipher-invalid buffer overlap")
 	}
 
 	counter := g.deriveCounter(nonce)
@@ -328,7 +328,7 @@ func (g *gcmKMA) Seal(dst, nonce, plaintext, data []byte) []byte {
 // for details.
 func (g *gcmKMA) Open(dst, nonce, ciphertext, data []byte) ([]byte, error) {
 	if len(nonce) != g.nonceSize {
-		panic("crypto/cipher: incorrect nonce length given to GCM")
+		return errors.New("crypto/cipher-incorrect nonce length given to GCM")
 	}
 	if len(ciphertext) < g.tagSize {
 		return nil, errOpen
@@ -341,11 +341,11 @@ func (g *gcmKMA) Open(dst, nonce, ciphertext, data []byte) ([]byte, error) {
 	ciphertext = ciphertext[:len(ciphertext)-g.tagSize]
 	ret, out := sliceForAppend(dst, len(ciphertext))
 	if subtleoverlap.InexactOverlap(out, ciphertext) {
-		panic("crypto/cipher: invalid buffer overlap")
+		return errors.New("crypto/cipher-invalid buffer overlap")
 	}
 
 	if g.tagSize < gcmMinimumTagSize {
-		panic("crypto/cipher: incorrect GCM tag size")
+		return errors.New("crypto/cipher-incorrect GCM tag size")
 	}
 
 	counter := g.deriveCounter(nonce)

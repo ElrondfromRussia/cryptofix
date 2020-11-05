@@ -18,7 +18,7 @@ type StreamReader struct {
 
 func (r StreamReader) Read(dst []byte) (n int, err error) {
 	n, err = r.R.Read(dst)
-	r.S.XORKeyStream(dst[:n], dst[:n])
+	err = r.S.XORKeyStream(dst[:n], dst[:n])
 	return
 }
 
@@ -35,7 +35,10 @@ type StreamWriter struct {
 
 func (w StreamWriter) Write(src []byte) (n int, err error) {
 	c := make([]byte, len(src))
-	w.S.XORKeyStream(c, src)
+	err = w.S.XORKeyStream(c, src)
+	if err != nil {
+		return
+	}
 	n, err = w.W.Write(c)
 	if n != len(src) && err == nil { // should never happen
 		err = io.ErrShortWrite

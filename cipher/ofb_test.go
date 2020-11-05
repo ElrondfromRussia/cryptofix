@@ -77,21 +77,37 @@ func TestOFB(t *testing.T) {
 
 		for j := 0; j <= 5; j += 5 {
 			plaintext := tt.in[0 : len(tt.in)-j]
-			ofb := cipher.NewOFB(c, tt.iv)
+			ofb, err := cipher.NewOFB(c, tt.iv)
+			if err != nil {
+				t.Error("bad TesetOFB1")
+			}
 			ciphertext := make([]byte, len(plaintext))
-			ofb.XORKeyStream(ciphertext, plaintext)
-			if !bytes.Equal(ciphertext, tt.out[:len(plaintext)]) {
-				t.Errorf("%s/%d: encrypting\ninput % x\nhave % x\nwant % x", test, len(plaintext), plaintext, ciphertext, tt.out)
+			if ofb != nil {
+				err = ofb.XORKeyStream(ciphertext, plaintext)
+				if err != nil {
+					t.Error("bad TesetOFB2")
+				}
+				if !bytes.Equal(ciphertext, tt.out[:len(plaintext)]) {
+					t.Errorf("%s/%d: encrypting\ninput % x\nhave % x\nwant % x", test, len(plaintext), plaintext, ciphertext, tt.out)
+				}
 			}
 		}
 
 		for j := 0; j <= 5; j += 5 {
 			ciphertext := tt.out[0 : len(tt.in)-j]
-			ofb := cipher.NewOFB(c, tt.iv)
+			ofb, err := cipher.NewOFB(c, tt.iv)
+			if err != nil {
+				t.Error("bad TesetOFB3")
+			}
 			plaintext := make([]byte, len(ciphertext))
-			ofb.XORKeyStream(plaintext, ciphertext)
-			if !bytes.Equal(plaintext, tt.in[:len(ciphertext)]) {
-				t.Errorf("%s/%d: decrypting\nhave % x\nwant % x", test, len(ciphertext), plaintext, tt.in)
+			if ofb != nil {
+				err = ofb.XORKeyStream(plaintext, ciphertext)
+				if err != nil {
+					t.Error("bad TesetOFB4")
+				}
+				if !bytes.Equal(plaintext, tt.in[:len(ciphertext)]) {
+					t.Errorf("%s/%d: decrypting\nhave % x\nwant % x", test, len(ciphertext), plaintext, tt.in)
+				}
 			}
 		}
 

@@ -12,9 +12,9 @@ import (
 
 type noopBlock int
 
-func (b noopBlock) BlockSize() int        { return int(b) }
-func (noopBlock) Encrypt(dst, src []byte) { copy(dst, src) }
-func (noopBlock) Decrypt(dst, src []byte) { copy(dst, src) }
+func (b noopBlock) BlockSize() int              { return int(b) }
+func (noopBlock) Encrypt(dst, src []byte) error { copy(dst, src); return nil }
+func (noopBlock) Decrypt(dst, src []byte) error { copy(dst, src); return nil }
 
 func inc(b []byte) {
 	for i := len(b) - 1; i >= 0; i++ {
@@ -34,7 +34,10 @@ func xor(a, b []byte) {
 func TestCTR(t *testing.T) {
 	for size := 64; size <= 1024; size *= 2 {
 		iv := make([]byte, size)
-		ctr := cipher.NewCTR(noopBlock(size), iv)
+		ctr, err := cipher.NewCTR(noopBlock(size), iv)
+		if err != nil {
+			t.Error("bad NewCTR", err)
+		}
 		src := make([]byte, 1024)
 		for i := range src {
 			src[i] = 0xff
@@ -47,7 +50,10 @@ func TestCTR(t *testing.T) {
 			xor(want[i*size:(i+1)*size], counter)
 		}
 		dst := make([]byte, 1024)
-		ctr.XORKeyStream(dst, src)
+		err = ctr.XORKeyStream(dst, src)
+		if err != nil {
+			t.Errorf("bad TestCTR (for size %d\nhave %x\nwant %x)", size, dst, want)
+		}
 		if !bytes.Equal(dst, want) {
 			t.Errorf("for size %d\nhave %x\nwant %x", size, dst, want)
 		}

@@ -11,7 +11,10 @@
 
 package cipher
 
-import "github.com/ElrondfromRussia/cryptofix/internal/subtle"
+import (
+	"errors"
+	"github.com/ElrondfromRussia/cryptofix/internal/subtle"
+)
 
 type cbc struct {
 	b         Block
@@ -42,27 +45,27 @@ type cbcEncAble interface {
 // NewCBCEncrypter returns a BlockMode which encrypts in cipher block chaining
 // mode, using the given Block. The length of iv must be the same as the
 // Block's block size.
-func NewCBCEncrypter(b Block, iv []byte) BlockMode {
+func NewCBCEncrypter(b Block, iv []byte) (BlockMode, error) {
 	if len(iv) != b.BlockSize() {
-		panic("cipher.NewCBCEncrypter: IV length must equal block size")
+		return nil, errors.New("cipher.NewCBCEncrypter: IV length must equal block size")
 	}
 	if cbc, ok := b.(cbcEncAble); ok {
-		return cbc.NewCBCEncrypter(iv)
+		return cbc.NewCBCEncrypter(iv), nil
 	}
-	return (*cbcEncrypter)(newCBC(b, iv))
+	return (*cbcEncrypter)(newCBC(b, iv)), nil
 }
 
 func (x *cbcEncrypter) BlockSize() int { return x.blockSize }
 
-func (x *cbcEncrypter) CryptBlocks(dst, src []byte) {
+func (x *cbcEncrypter) CryptBlocks(dst, src []byte) error {
 	if len(src)%x.blockSize != 0 {
-		panic("crypto/cipher: input not full blocks")
+		return errors.New("crypto/cipher-input not full blocks")
 	}
 	if len(dst) < len(src) {
-		panic("crypto/cipher: output smaller than input")
+		return errors.New("crypto/cipher-output smaller than input")
 	}
 	if subtle.InexactOverlap(dst[:len(src)], src) {
-		panic("crypto/cipher: invalid buffer overlap")
+		return errors.New("crypto/cipher-invalid buffer overlap")
 	}
 
 	iv := x.iv
@@ -70,7 +73,10 @@ func (x *cbcEncrypter) CryptBlocks(dst, src []byte) {
 	for len(src) > 0 {
 		// Write the xor to dst, then encrypt in place.
 		xorBytes(dst[:x.blockSize], src[:x.blockSize], iv)
-		x.b.Encrypt(dst[:x.blockSize], dst[:x.blockSize])
+		err := x.b.Encrypt(dst[:x.blockSize], dst[:x.blockSize])
+		if err != nil {
+			return errors.New("crypto/cipher-x.b.Encrypt bad")
+		}
 
 		// Move to the next block with this block as the next iv.
 		iv = dst[:x.blockSize]
@@ -80,13 +86,15 @@ func (x *cbcEncrypter) CryptBlocks(dst, src []byte) {
 
 	// Save the iv for the next CryptBlocks call.
 	copy(x.iv, iv)
+	return nil
 }
 
-func (x *cbcEncrypter) SetIV(iv []byte) {
+func (x *cbcEncrypter) SetIV(iv []byte) error {
 	if len(iv) != len(x.iv) {
-		panic("cipher: incorrect length IV")
+		return errors.New("crypto/cipher-incorrect length IV")
 	}
 	copy(x.iv, iv)
+	return nil
 }
 
 type cbcDecrypter cbc
@@ -102,30 +110,30 @@ type cbcDecAble interface {
 // NewCBCDecrypter returns a BlockMode which decrypts in cipher block chaining
 // mode, using the given Block. The length of iv must be the same as the
 // Block's block size and must match the iv used to encrypt the data.
-func NewCBCDecrypter(b Block, iv []byte) BlockMode {
+func NewCBCDecrypter(b Block, iv []byte) (BlockMode, error) {
 	if len(iv) != b.BlockSize() {
-		panic("cipher.NewCBCDecrypter: IV length must equal block size")
+		return nil, errors.New("cipher.NewCBCDecrypter: IV length must equal block size")
 	}
 	if cbc, ok := b.(cbcDecAble); ok {
-		return cbc.NewCBCDecrypter(iv)
+		return cbc.NewCBCDecrypter(iv), nil
 	}
-	return (*cbcDecrypter)(newCBC(b, iv))
+	return (*cbcDecrypter)(newCBC(b, iv)), nil
 }
 
 func (x *cbcDecrypter) BlockSize() int { return x.blockSize }
 
-func (x *cbcDecrypter) CryptBlocks(dst, src []byte) {
+func (x *cbcDecrypter) CryptBlocks(dst, src []byte) error {
 	if len(src)%x.blockSize != 0 {
-		panic("crypto/cipher: input not full blocks")
+		return errors.New("crypto/cipher-input not full blocks")
 	}
 	if len(dst) < len(src) {
-		panic("crypto/cipher: output smaller than input")
+		return errors.New("crypto/cipher-output smaller than input")
 	}
 	if subtle.InexactOverlap(dst[:len(src)], src) {
-		panic("crypto/cipher: invalid buffer overlap")
+		return errors.New("crypto/cipher-invalid buffer overlap")
 	}
 	if len(src) == 0 {
-		return
+		return nil
 	}
 
 	// For each block, we need to xor the decrypted data with the previous block's ciphertext (the iv).
@@ -139,7 +147,10 @@ func (x *cbcDecrypter) CryptBlocks(dst, src []byte) {
 
 	// Loop over all but the first block.
 	for start > 0 {
-		x.b.Decrypt(dst[start:end], src[start:end])
+		err := x.b.Decrypt(dst[start:end], src[start:end])
+		if err != nil {
+			return errors.New("crypto/cipher-x.b.Decrypt1 bad")
+		}
 		xorBytes(dst[start:end], dst[start:end], src[prev:start])
 
 		end = start
@@ -148,16 +159,21 @@ func (x *cbcDecrypter) CryptBlocks(dst, src []byte) {
 	}
 
 	// The first block is special because it uses the saved iv.
-	x.b.Decrypt(dst[start:end], src[start:end])
+	err := x.b.Decrypt(dst[start:end], src[start:end])
+	if err != nil {
+		return errors.New("crypto/cipher-x.b.Decrypt2 bad")
+	}
 	xorBytes(dst[start:end], dst[start:end], x.iv)
 
 	// Set the new iv to the first block we copied earlier.
 	x.iv, x.tmp = x.tmp, x.iv
+	return nil
 }
 
-func (x *cbcDecrypter) SetIV(iv []byte) {
+func (x *cbcDecrypter) SetIV(iv []byte) error {
 	if len(iv) != len(x.iv) {
-		panic("cipher: incorrect length IV")
+		return errors.New("crypto/cipher-incorrect length IV")
 	}
 	copy(x.iv, iv)
+	return nil
 }

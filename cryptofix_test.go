@@ -34,8 +34,14 @@ func TestCryptofix(t *testing.T) {
 	}
 
 	decrypted := make([]byte, len(rDb))
-	mode := cipher.NewCBCDecrypter(block, iv)
-	mode.CryptBlocks(decrypted, rDb)
+	mode, err := cipher.NewCBCDecrypter(block, iv)
+	if err != nil {
+		t.Error("BAD DECRYPT4: ", err)
+	}
+	err = mode.CryptBlocks(decrypted, rDb)
+	if err == nil {
+		t.Error("BAD DECRYPT5: ", err)
+	}
 
 	t.Log(decrypted)
 }

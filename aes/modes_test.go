@@ -23,8 +23,8 @@ type testInterface interface {
 type testBlock struct{}
 
 func (*testBlock) BlockSize() int      { return 0 }
-func (*testBlock) Encrypt(a, b []byte) {}
-func (*testBlock) Decrypt(a, b []byte) {}
+func (*testBlock) Encrypt(a, b []byte) error {return nil}
+func (*testBlock) Decrypt(a, b []byte) error {return nil}
 func (*testBlock) NewGCM(int, int) (cipher.AEAD, error) {
 	return &testAEAD{}, nil
 }
@@ -43,7 +43,7 @@ type testAEAD struct{}
 
 func (*testAEAD) NonceSize() int                         { return 0 }
 func (*testAEAD) Overhead() int                          { return 0 }
-func (*testAEAD) Seal(a, b, c, d []byte) []byte          { return []byte{} }
+func (*testAEAD) Seal(a, b, c, d []byte) ([]byte, error) { return []byte{}, nil }
 func (*testAEAD) Open(a, b, c, d []byte) ([]byte, error) { return []byte{}, nil }
 func (*testAEAD) InAESPackage() bool                     { return true }
 

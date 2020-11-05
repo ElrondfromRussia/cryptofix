@@ -32,9 +32,9 @@ type aesctr struct {
 
 // NewCTR returns a Stream which encrypts/decrypts using the AES block
 // cipher in counter mode. The length of iv must be the same as BlockSize.
-func (c *aesCipherAsm) NewCTR(iv []byte) cipher.Stream {
+func (c *aesCipherAsm) NewCTR(iv []byte) (cipher.Stream, error) {
 	if len(iv) != BlockSize {
-		panic("cipher.NewCTR: IV length must equal block size")
+		return errors.New("cipher.NewCTR-IV length must equal block size")
 	}
 	var ac aesctr
 	ac.block = c
@@ -64,12 +64,12 @@ func (c *aesctr) refill() {
 	cryptBlocks(c.block.function, &c.block.key[0], &c.buffer[0], &c.buffer[0], streamBufferSize)
 }
 
-func (c *aesctr) XORKeyStream(dst, src []byte) {
+func (c *aesctr) XORKeyStream(dst, src []byte) error {
 	if len(dst) < len(src) {
-		panic("crypto/cipher: output smaller than input")
+		return errors.New("crypto/cipher-output smaller than input")
 	}
 	if subtle.InexactOverlap(dst[:len(src)], src) {
-		panic("crypto/cipher: invalid buffer overlap")
+		return errors.New("crypto/cipher-invalid buffer overlap")
 	}
 	for len(src) > 0 {
 		if len(c.buffer) == 0 {

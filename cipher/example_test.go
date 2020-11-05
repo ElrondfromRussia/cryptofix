@@ -40,7 +40,10 @@ func ExampleNewGCM_encrypt() {
 		panic(err.Error())
 	}
 
-	ciphertext := aesgcm.Seal(nil, nonce, plaintext, nil)
+	ciphertext, err := aesgcm.Seal(nil, nonce, plaintext, nil)
+	if err != nil {
+		panic(err.Error())
+	}
 	fmt.Printf("%x\n", ciphertext)
 }
 
@@ -99,10 +102,16 @@ func ExampleNewCBCDecrypter() {
 		panic("ciphertext is not a multiple of the block size")
 	}
 
-	mode := cipher.NewCBCDecrypter(block, iv)
+	mode, err := cipher.NewCBCDecrypter(block, iv)
+	if err != nil {
+		panic(err)
+	}
 
 	// CryptBlocks can work in-place if the two arguments are the same.
-	mode.CryptBlocks(ciphertext, ciphertext)
+	err = mode.CryptBlocks(ciphertext, ciphertext)
+	if err != nil {
+		panic(err)
+	}
 
 	// If the original plaintext lengths are not a multiple of the block
 	// size, padding would have to be added when encrypting, which would be
@@ -145,8 +154,14 @@ func ExampleNewCBCEncrypter() {
 		panic(err)
 	}
 
-	mode := cipher.NewCBCEncrypter(block, iv)
-	mode.CryptBlocks(ciphertext[aes.BlockSize:], plaintext)
+	mode, err := cipher.NewCBCEncrypter(block, iv)
+	if err != nil {
+		panic(err)
+	}
+	err = mode.CryptBlocks(ciphertext[aes.BlockSize:], plaintext)
+	if err != nil {
+		panic(err)
+	}
 
 	// It's important to remember that ciphertexts must be authenticated
 	// (i.e. by using crypto/hmac) as well as being encrypted in order to
@@ -176,10 +191,16 @@ func ExampleNewCFBDecrypter() {
 	iv := ciphertext[:aes.BlockSize]
 	ciphertext = ciphertext[aes.BlockSize:]
 
-	stream := cipher.NewCFBDecrypter(block, iv)
+	stream, err := cipher.NewCFBDecrypter(block, iv)
+	if err != nil {
+		panic(err)
+	}
 
 	// XORKeyStream can work in-place if the two arguments are the same.
-	stream.XORKeyStream(ciphertext, ciphertext)
+	err = stream.XORKeyStream(ciphertext, ciphertext)
+	if err != nil {
+		panic(err.Error())
+	}
 	fmt.Printf("%s", ciphertext)
 	// Output: some plaintext
 }
@@ -205,8 +226,14 @@ func ExampleNewCFBEncrypter() {
 		panic(err)
 	}
 
-	stream := cipher.NewCFBEncrypter(block, iv)
-	stream.XORKeyStream(ciphertext[aes.BlockSize:], plaintext)
+	stream, err := cipher.NewCFBEncrypter(block, iv)
+	if err != nil {
+		panic(err)
+	}
+	err = stream.XORKeyStream(ciphertext[aes.BlockSize:], plaintext)
+	if err != nil {
+		panic(err.Error())
+	}
 
 	// It's important to remember that ciphertexts must be authenticated
 	// (i.e. by using crypto/hmac) as well as being encrypted in order to
@@ -235,8 +262,14 @@ func ExampleNewCTR() {
 		panic(err)
 	}
 
-	stream := cipher.NewCTR(block, iv)
-	stream.XORKeyStream(ciphertext[aes.BlockSize:], plaintext)
+	stream, err := cipher.NewCTR(block, iv)
+	if err != nil {
+		panic(err)
+	}
+	err = stream.XORKeyStream(ciphertext[aes.BlockSize:], plaintext)
+	if err != nil {
+		panic(err.Error())
+	}
 
 	// It's important to remember that ciphertexts must be authenticated
 	// (i.e. by using crypto/hmac) as well as being encrypted in order to
@@ -246,8 +279,14 @@ func ExampleNewCTR() {
 	// also decrypt that ciphertext with NewCTR.
 
 	plaintext2 := make([]byte, len(plaintext))
-	stream = cipher.NewCTR(block, iv)
-	stream.XORKeyStream(plaintext2, ciphertext[aes.BlockSize:])
+	stream, err = cipher.NewCTR(block, iv)
+	if err != nil {
+		panic(err)
+	}
+	err = stream.XORKeyStream(plaintext2, ciphertext[aes.BlockSize:])
+	if err != nil {
+		panic(err.Error())
+	}
 
 	fmt.Printf("%s\n", plaintext2)
 	// Output: some plaintext
@@ -274,8 +313,14 @@ func ExampleNewOFB() {
 		panic(err)
 	}
 
-	stream := cipher.NewOFB(block, iv)
-	stream.XORKeyStream(ciphertext[aes.BlockSize:], plaintext)
+	stream, err := cipher.NewOFB(block, iv)
+	if err != nil {
+		panic(err.Error())
+	}
+	err = stream.XORKeyStream(ciphertext[aes.BlockSize:], plaintext)
+	if err != nil {
+		panic(err.Error())
+	}
 
 	// It's important to remember that ciphertexts must be authenticated
 	// (i.e. by using crypto/hmac) as well as being encrypted in order to
@@ -285,8 +330,14 @@ func ExampleNewOFB() {
 	// also decrypt that ciphertext with NewOFB.
 
 	plaintext2 := make([]byte, len(plaintext))
-	stream = cipher.NewOFB(block, iv)
-	stream.XORKeyStream(plaintext2, ciphertext[aes.BlockSize:])
+	stream, err = cipher.NewOFB(block, iv)
+	if err != nil {
+		panic(err.Error())
+	}
+	err = stream.XORKeyStream(plaintext2, ciphertext[aes.BlockSize:])
+	if err != nil {
+		panic(err.Error())
+	}
 
 	fmt.Printf("%s\n", plaintext2)
 	// Output: some plaintext
@@ -310,7 +361,10 @@ func ExampleStreamReader() {
 	// If the key is unique for each ciphertext, then it's ok to use a zero
 	// IV.
 	var iv [aes.BlockSize]byte
-	stream := cipher.NewOFB(block, iv[:])
+	stream, err := cipher.NewOFB(block, iv[:])
+	if err != nil {
+		panic(err.Error())
+	}
 
 	reader := &cipher.StreamReader{S: stream, R: bReader}
 	// Copy the input to the output stream, decrypting as we go.
@@ -343,7 +397,10 @@ func ExampleStreamWriter() {
 	// If the key is unique for each ciphertext, then it's ok to use a zero
 	// IV.
 	var iv [aes.BlockSize]byte
-	stream := cipher.NewOFB(block, iv[:])
+	stream, err := cipher.NewOFB(block, iv[:])
+	if err != nil {
+		panic(err.Error())
+	}
 
 	var out bytes.Buffer
 
