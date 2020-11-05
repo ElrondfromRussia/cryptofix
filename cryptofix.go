@@ -8,6 +8,7 @@
 package cryptofix
 
 import (
+	"errors"
 	"hash"
 	"io"
 	"strconv"
@@ -50,25 +51,25 @@ var digestSizes = []uint8{
 // Size returns the length, in bytes, of a digest resulting from the given hash
 // function. It doesn't require that the hash function in question be linked
 // into the program.
-func (h Hash) Size() int {
+func (h Hash) Size() (int, error) {
 	if h > 0 && h < maxHash {
-		return int(digestSizes[h])
+		return int(digestSizes[h]), nil
 	}
-	panic("crypto: Size of unknown hash function")
+	return 0, errors.New("crypto-size of unknown hash function")
 }
 
 var hashes = make([]func() hash.Hash, maxHash)
 
 // New returns a new hash.Hash calculating the given hash function. New panics
 // if the hash function is not linked into the binary.
-func (h Hash) New() hash.Hash {
+func (h Hash) New() (hash.Hash, error) {
 	if h > 0 && h < maxHash {
 		f := hashes[h]
 		if f != nil {
-			return f()
+			return f(), nil
 		}
 	}
-	panic("crypto: requested hash function #" + strconv.Itoa(int(h)) + " is unavailable")
+	return nil, errors.New("crypto: requested hash function #" + strconv.Itoa(int(h)) + " is unavailable")
 }
 
 // Available reports whether the given hash function is linked into the binary.
@@ -79,11 +80,12 @@ func (h Hash) Available() bool {
 // RegisterHash registers a function that returns a new instance of the given
 // hash function. This is intended to be called from the init function in
 // packages that implement hash functions.
-func RegisterHash(h Hash, f func() hash.Hash) {
+func RegisterHash(h Hash, f func() hash.Hash) error {
 	if h >= maxHash {
-		panic("crypto: RegisterHash of unknown hash function")
+		return errors.New("crypto-registerHash of unknown hash function")
 	}
 	hashes[h] = f
+	return nil
 }
 
 // PublicKey represents a public key using an unspecified algorithm.
