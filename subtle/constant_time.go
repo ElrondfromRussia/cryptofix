@@ -6,6 +6,8 @@
 // code but require careful thought to use correctly.
 package subtle
 
+import "errors"
+
 // ConstantTimeCompare returns 1 if the two slices, x and y, have equal contents
 // and 0 otherwise. The time taken is a function of the length of the slices and
 // is independent of the contents.
@@ -40,9 +42,9 @@ func ConstantTimeEq(x, y int32) int {
 // ConstantTimeCopy copies the contents of y into x (a slice of equal length)
 // if v == 1. If v == 0, x is left unchanged. Its behavior is undefined if v
 // takes any other value.
-func ConstantTimeCopy(v int, x, y []byte) {
+func ConstantTimeCopy(v int, x, y []byte) error {
 	if len(x) != len(y) {
-		panic("subtle: slices have different lengths")
+		return errors.New("subtle-slices have different lengths")
 	}
 
 	xmask := byte(v - 1)
@@ -50,6 +52,7 @@ func ConstantTimeCopy(v int, x, y []byte) {
 	for i := 0; i < len(x); i++ {
 		x[i] = x[i]&xmask | y[i]&ymask
 	}
+	return nil
 }
 
 // ConstantTimeLessOrEq returns 1 if x <= y and 0 otherwise.

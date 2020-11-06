@@ -105,7 +105,7 @@ func Prime(rand io.Reader, bits int) (p *big.Int, err error) {
 // Int returns a uniform random value in [0, max). It panics if max <= 0.
 func Int(rand io.Reader, max *big.Int) (n *big.Int, err error) {
 	if max.Sign() <= 0 {
-		panic("crypto/rand: argument to Int is <= 0")
+		return nil, errors.New("crypto/rand-argument to Int is <= 0")
 	}
 	n = new(big.Int)
 	n.Sub(max, n.SetUint64(1))

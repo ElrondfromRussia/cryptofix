@@ -88,15 +88,18 @@ func makeCopy(v int, x, y []byte) []byte {
 	return x
 }
 
-func constantTimeCopyWrapper(v int, x, y []byte) []byte {
+func constantTimeCopyWrapper(v int, x, y []byte) ([]byte, error) {
 	if len(x) > len(y) {
 		x = x[0:len(y)]
 	} else {
 		y = y[0:len(x)]
 	}
 	v &= 1
-	ConstantTimeCopy(v, x, y)
-	return x
+	err := ConstantTimeCopy(v, x, y)
+	if err != nil {
+		return nil, err
+	}
+	return x, nil
 }
 
 func TestConstantTimeCopy(t *testing.T) {

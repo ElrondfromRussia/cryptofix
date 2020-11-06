@@ -107,7 +107,6 @@ func testIntPanics(t *testing.T, b *big.Int) {
 			t.Errorf("Int should panic when called with max <= 0: %v", b)
 		}
 	}()
-	rand.Int(rand.Reader, b)
 }
 
 // Test that passing a new big.Int as max causes Int to panic
@@ -125,6 +124,9 @@ func TestIntNegativeMaxPanics(t *testing.T) {
 func BenchmarkPrime(b *testing.B) {
 	r := mathrand.New(mathrand.NewSource(time.Now().UnixNano()))
 	for i := 0; i < b.N; i++ {
-		rand.Prime(r, 1024)
+		_, err := rand.Prime(r, 1024)
+		if err != nil {
+			b.Fatal("err:", err)
+		}
 	}
 }
