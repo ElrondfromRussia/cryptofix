@@ -7,7 +7,7 @@
 package rand
 
 import (
-	"syscall/unix"
+	"golang.org/x/sys/unix"
 )
 
 // maxGetRandomRead is platform dependent.

@@ -106,7 +106,10 @@ func NewKeyFromSeed(seed []byte) (PrivateKey, error) {
 		return nil, errors.New("ed25519-bad seed length: " + strconv.Itoa(l))
 	}
 
-	digest := sha512.Sum512(seed)
+	digest, err := sha512.Sum512(seed)
+	if err != nil {
+		return nil, err
+	}
 	digest[0] &= 248
 	digest[31] &= 127
 	digest[31] |= 64
