@@ -199,7 +199,8 @@ func (b *Builder) addLengthPrefixed(lenLen int, isASN1 bool, f BuilderContinuati
 	b.callContinuation(f, b.child)
 	b.flushChild()
 	if b.child != nil {
-		panic("cryptobyte: internal error")
+		b.err = errors.New("cryptobyte: internal error")
+		return
 	}
 }
 
@@ -219,7 +220,8 @@ func (b *Builder) flushChild() {
 	length := len(child.result) - child.pendingLenLen - child.offset
 
 	if length < 0 {
-		panic("cryptobyte: internal error") // result unexpectedly shrunk
+		b.err = errors.New("cryptobyte: internal error")
+		return // result unexpectedly shrunk
 	}
 
 	if child.pendingIsASN1 {
@@ -227,7 +229,8 @@ func (b *Builder) flushChild() {
 		// to be incorrect, we have to move the contents along in order to make
 		// space.
 		if child.pendingLenLen != 1 {
-			panic("cryptobyte: internal error")
+			b.err = errors.New("cryptobyte: internal error")
+			return
 		}
 		var lenLen, lenByte uint8
 		if int64(length) > 0xfffffffe {
@@ -275,7 +278,8 @@ func (b *Builder) flushChild() {
 	}
 
 	if b.fixedSize && &b.result[0] != &child.result[0] {
-		panic("cryptobyte: BuilderContinuation reallocated a fixed-size buffer")
+		b.err = errors.New("cryptobyte: BuilderContinuation reallocated a fixed-size buffer")
+		return
 	}
 
 	b.result = child.result
@@ -286,10 +290,12 @@ func (b *Builder) add(bytes ...byte) {
 		return
 	}
 	if b.child != nil {
-		panic("cryptobyte: attempted write while child is pending")
+		b.err = errors.New("cryptobyte: attempted write while child is pending")
+		return
 	}
 	if len(b.result)+len(bytes) < len(bytes) {
 		b.err = errors.New("cryptobyte: length overflow")
+		return
 	}
 	if b.fixedSize && len(b.result)+len(bytes) > cap(b.result) {
 		b.err = errors.New("cryptobyte: Builder is exceeding its fixed-size buffer")
@@ -300,22 +306,26 @@ func (b *Builder) add(bytes ...byte) {
 
 // Unwrite rolls back n bytes written directly to the Builder. An attempt by a
 // child builder passed to a continuation to unwrite bytes from its parent will
-// panic.
+// error.
 func (b *Builder) Unwrite(n int) {
 	if b.err != nil {
 		return
 	}
 	if b.child != nil {
-		panic("cryptobyte: attempted unwrite while child is pending")
+		b.err = errors.New("cryptobyte: attempted unwrite while child is pendin")
+		return
 	}
 	length := len(b.result) - b.pendingLenLen - b.offset
 	if length < 0 {
-		panic("cryptobyte: internal error")
+		b.err = errors.New("cryptobyte: internal error")
+		return
 	}
 	if n > length {
-		panic("cryptobyte: attempted to unwrite more than was written")
+		b.err = errors.New("cryptobyte: attempted unwrite while child is pending")
+		return
 	}
 	b.result = b.result[:len(b.result)-n]
+	return
 }
 
 // A MarshalingValue marshals itself into a Builder.

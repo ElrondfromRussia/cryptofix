@@ -6,6 +6,7 @@ package cryptobyte
 
 import (
 	encoding_asn1 "encoding/asn1"
+	"errors"
 	"fmt"
 	"math/big"
 	"reflect"
@@ -254,33 +255,33 @@ func (s *String) ReadASN1Boolean(out *bool) bool {
 var bigIntType = reflect.TypeOf((*big.Int)(nil)).Elem()
 
 // ReadASN1Integer decodes an ASN.1 INTEGER into out and advances. If out does
-// not point to an integer or to a big.Int, it panics. It reports whether the
+// not point to an integer or to a big.Int, it errors. It reports whether the
 // read was successful.
-func (s *String) ReadASN1Integer(out interface{}) bool {
+func (s *String) ReadASN1Integer(out interface{}) (bool, error) {
 	if reflect.TypeOf(out).Kind() != reflect.Ptr {
-		panic("out is not a pointer")
+		return false, errors.New("out is not a pointer")
 	}
 	switch reflect.ValueOf(out).Elem().Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		var i int64
 		if !s.readASN1Int64(&i) || reflect.ValueOf(out).Elem().OverflowInt(i) {
-			return false
+			return false, nil
 		}
 		reflect.ValueOf(out).Elem().SetInt(i)
-		return true
+		return true, nil
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		var u uint64
 		if !s.readASN1Uint64(&u) || reflect.ValueOf(out).Elem().OverflowUint(u) {
-			return false
+			return false, nil
 		}
 		reflect.ValueOf(out).Elem().SetUint(u)
-		return true
+		return true, nil
 	case reflect.Struct:
 		if reflect.TypeOf(out).Elem() == bigIntType {
-			return s.readASN1BigInt(out.(*big.Int))
+			return s.readASN1BigInt(out.(*big.Int)), nil
 		}
 	}
-	panic("out does not point to an integer type")
+	return false, errors.New("out is not a pointer")
 }
 
 func checkASN1Integer(bytes []byte) bool {
@@ -519,7 +520,7 @@ func (s *String) ReadASN1Bytes(out *[]byte, tag asn1.Tag) bool {
 // Tags greater than 30 are not supported (i.e. low-tag-number format only).
 func (s *String) ReadASN1(out *String, tag asn1.Tag) bool {
 	var t asn1.Tag
-	if !s.ReadAnyASN1(out, &t) || t != tag {
+	if res, err := s.ReadAnyASN1(out, &t); !res || t != tag || err != nil {
 		return false
 	}
 	return true
@@ -532,7 +533,7 @@ func (s *String) ReadASN1(out *String, tag asn1.Tag) bool {
 // Tags greater than 30 are not supported (i.e. low-tag-number format only).
 func (s *String) ReadASN1Element(out *String, tag asn1.Tag) bool {
 	var t asn1.Tag
-	if !s.ReadAnyASN1Element(out, &t) || t != tag {
+	if res, err := s.ReadAnyASN1Element(out, &t); !res || t != tag || err != nil {
 		return false
 	}
 	return true
@@ -543,7 +544,7 @@ func (s *String) ReadASN1Element(out *String, tag asn1.Tag) bool {
 // It reports whether the read was successful.
 //
 // Tags greater than 30 are not supported (i.e. low-tag-number format only).
-func (s *String) ReadAnyASN1(out *String, outTag *asn1.Tag) bool {
+func (s *String) ReadAnyASN1(out *String, outTag *asn1.Tag) (bool, error) {
 	return s.readASN1(out, outTag, true /* skip header */)
 }
 
@@ -552,7 +553,7 @@ func (s *String) ReadAnyASN1(out *String, outTag *asn1.Tag) bool {
 // advances. It reports whether the read was successful.
 //
 // Tags greater than 30 are not supported (i.e. low-tag-number format only).
-func (s *String) ReadAnyASN1Element(out *String, outTag *asn1.Tag) bool {
+func (s *String) ReadAnyASN1Element(out *String, outTag *asn1.Tag) (bool, error) {
 	return s.readASN1(out, outTag, false /* include header */)
 }
 
@@ -600,16 +601,16 @@ func (s *String) SkipOptionalASN1(tag asn1.Tag) bool {
 // ReadOptionalASN1Integer attempts to read an optional ASN.1 INTEGER
 // explicitly tagged with tag into out and advances. If no element with a
 // matching tag is present, it writes defaultValue into out instead. If out
-// does not point to an integer or to a big.Int, it panics. It reports
+// does not point to an integer or to a big.Int, it errors. It reports
 // whether the read was successful.
-func (s *String) ReadOptionalASN1Integer(out interface{}, tag asn1.Tag, defaultValue interface{}) bool {
+func (s *String) ReadOptionalASN1Integer(out interface{}, tag asn1.Tag, defaultValue interface{}) (bool, error) {
 	if reflect.TypeOf(out).Kind() != reflect.Ptr {
-		panic("out is not a pointer")
+		return false, errors.New("out is not a pointer")
 	}
 	var present bool
 	var i String
 	if !s.ReadOptionalASN1(&i, &present, tag) {
-		return false
+		return false, nil
 	}
 	if !present {
 		switch reflect.ValueOf(out).Elem().Kind() {
@@ -618,22 +619,22 @@ func (s *String) ReadOptionalASN1Integer(out interface{}, tag asn1.Tag, defaultV
 			reflect.ValueOf(out).Elem().Set(reflect.ValueOf(defaultValue))
 		case reflect.Struct:
 			if reflect.TypeOf(out).Elem() != bigIntType {
-				panic("invalid integer type")
+				return false, errors.New("invalid integer type")
 			}
 			if reflect.TypeOf(defaultValue).Kind() != reflect.Ptr ||
 				reflect.TypeOf(defaultValue).Elem() != bigIntType {
-				panic("out points to big.Int, but defaultValue does not")
+				return false, errors.New("out points to big.Int, but defaultValue does not")
 			}
 			out.(*big.Int).Set(defaultValue.(*big.Int))
 		default:
-			panic("invalid integer type")
+			return false, errors.New("invalid integer type")
 		}
-		return true
+		return true, nil
 	}
-	if !i.ReadASN1Integer(out) || !i.Empty() {
-		return false
+	if res, err := i.ReadASN1Integer(out); !res || !i.Empty() || err != nil {
+		return false, err
 	}
-	return true
+	return true, nil
 }
 
 // ReadOptionalASN1OctetString attempts to read an optional ASN.1 OCTET STRING
@@ -679,9 +680,9 @@ func (s *String) ReadOptionalASN1Boolean(out *bool, defaultValue bool) bool {
 	return s.ReadASN1Boolean(out)
 }
 
-func (s *String) readASN1(out *String, outTag *asn1.Tag, skipHeader bool) bool {
+func (s *String) readASN1(out *String, outTag *asn1.Tag, skipHeader bool) (bool, error) {
 	if len(*s) < 2 {
-		return false
+		return false, nil
 	}
 	tag, lenByte := (*s)[0], (*s)[1]
 
@@ -691,7 +692,7 @@ func (s *String) readASN1(out *String, outTag *asn1.Tag, skipHeader bool) bool {
 		// An identifier octet with a tag part of 0x1f indicates a high-tag-number
 		// form identifier with two or more octets. We only support tags less than
 		// 31 (i.e. low-tag-number form, single octet identifier).
-		return false
+		return false, nil
 	}
 
 	if outTag != nil {
@@ -714,39 +715,39 @@ func (s *String) readASN1(out *String, outTag *asn1.Tag, skipHeader bool) bool {
 		var len32 uint32
 
 		if lenLen == 0 || lenLen > 4 || len(*s) < int(2+lenLen) {
-			return false
+			return false, nil
 		}
 
 		lenBytes := String((*s)[2 : 2+lenLen])
 		if !lenBytes.readUnsigned(&len32, int(lenLen)) {
-			return false
+			return false, nil
 		}
 
 		// ITU-T X.690 section 10.1 (DER length forms) requires encoding the length
 		// with the minimum number of octets.
 		if len32 < 128 {
 			// Length should have used short-form encoding.
-			return false
+			return false, nil
 		}
 		if len32>>((lenLen-1)*8) == 0 {
 			// Leading octet is 0. Length should have been at least one byte shorter.
-			return false
+			return false, nil
 		}
 
 		headerLen = 2 + uint32(lenLen)
 		if headerLen+len32 < len32 {
 			// Overflow.
-			return false
+			return false, nil
 		}
 		length = headerLen + len32
 	}
 
 	if int(length) < 0 || !s.ReadBytes((*[]byte)(out), int(length)) {
-		return false
+		return false, nil
 	}
 	if skipHeader && !out.Skip(int(headerLen)) {
-		panic("cryptobyte: internal error")
+		return false, errors.New("cryptobyte: internal error")
 	}
 
-	return true
+	return true, nil
 }

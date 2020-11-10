@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/crypto/cryptobyte/asn1"
+	"github.com/ElrondfromRussia/cryptofix/cryptobyte/asn1"
 )
 
 type readASN1Test struct {
@@ -107,9 +107,11 @@ func TestReadASN1OptionalInteger(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			in := String(test.in)
 			var out int
-			ok := in.ReadOptionalASN1Integer(&out, test.tag, defaultInt)
+			ok, err := in.ReadOptionalASN1Integer(&out, test.tag, defaultInt)
 			if ok != test.ok || ok && out != test.out.(int) {
 				t.Errorf("in.ReadOptionalASN1Integer() = %v, want %v; out = %v, want %v", ok, test.ok, out, test.out)
+			} else if err != nil {
+				t.Fatal(err)
 			}
 		})
 	}
@@ -136,9 +138,12 @@ func TestReadASN1IntegerSigned(t *testing.T) {
 	for i, test := range testData64 {
 		in := String(test.in)
 		var out int64
-		ok := in.ReadASN1Integer(&out)
+		ok, err := in.ReadASN1Integer(&out)
 		if !ok || out != test.out {
 			t.Errorf("#%d: in.ReadASN1Integer() = %v, want true; out = %d, want %d", i, ok, out, test.out)
+		}
+		if err != nil {
+			t.Fatal(err)
 		}
 	}
 
@@ -147,9 +152,12 @@ func TestReadASN1IntegerSigned(t *testing.T) {
 		for i, test := range testData64 {
 			in := String(test.in)
 			var out big.Int
-			ok := in.ReadASN1Integer(&out)
+			ok, err := in.ReadASN1Integer(&out)
 			if !ok || out.Int64() != test.out {
 				t.Errorf("#%d: in.ReadASN1Integer() = %v, want true; out = %d, want %d", i, ok, out.Int64(), test.out)
+			}
+			if err != nil {
+				t.Fatal(err)
 			}
 		}
 	})
@@ -207,9 +215,12 @@ func TestReadASN1IntegerUnsigned(t *testing.T) {
 	for i, test := range testData {
 		in := String(test.in)
 		var out uint64
-		ok := in.ReadASN1Integer(&out)
+		ok, err := in.ReadASN1Integer(&out)
 		if !ok || out != test.out {
 			t.Errorf("#%d: in.ReadASN1Integer() = %v, want true; out = %d, want %d", i, ok, out, test.out)
+		}
+		if err != nil {
+			t.Fatal(err)
 		}
 	}
 }
@@ -227,8 +238,12 @@ func TestReadASN1IntegerInvalid(t *testing.T) {
 
 	for i, test := range testData {
 		var out int64
-		if test.ReadASN1Integer(&out) {
+		res, err := test.ReadASN1Integer(&out)
+		if res {
 			t.Errorf("#%d: in.ReadASN1Integer() = true, want false (out = %d)", i, out)
+		}
+		if err != nil {
+			t.Fatal(err)
 		}
 	}
 }
@@ -346,9 +361,12 @@ func TestAddASN1BigInt(t *testing.T) {
 	}
 	s := String(got)
 	var y big.Int
-	ok := s.ReadASN1Integer(&y)
+	ok, err := s.ReadASN1Integer(&y)
 	if !ok || x.Cmp(&y) != 0 {
 		t.Errorf("unexpected bytes %v, want %v", &y, x)
+	}
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 

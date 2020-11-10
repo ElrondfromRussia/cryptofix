@@ -8,8 +8,8 @@ import (
 	"errors"
 	"fmt"
 
-	"golang.org/x/crypto/cryptobyte"
-	"golang.org/x/crypto/cryptobyte/asn1"
+	"github.com/ElrondfromRussia/cryptofix/cryptobyte"
+	"github.com/ElrondfromRussia/cryptofix/cryptobyte/asn1"
 )
 
 func ExampleString_lengthPrefixed() {
@@ -53,10 +53,20 @@ func ExampleString_aSN1() {
 		data, inner, versionBytes cryptobyte.String
 		haveVersion               bool
 	)
-	if !input.ReadASN1(&inner, asn1.SEQUENCE) ||
-		!input.Empty() ||
-		!inner.ReadOptionalASN1(&versionBytes, &haveVersion, asn1.Tag(6).Constructed().ContextSpecific()) ||
-		(haveVersion && !versionBytes.ReadASN1Integer(&version)) ||
+
+	res1 := input.ReadASN1(&inner, asn1.SEQUENCE)
+	res2 := input.Empty()
+	res3 := inner.ReadOptionalASN1(&versionBytes, &haveVersion, asn1.Tag(6).Constructed().ContextSpecific())
+
+	res4, err := versionBytes.ReadASN1Integer(&version)
+	if err != nil {
+		panic("bad ReadASN1Integer")
+	}
+
+	if !res1 ||
+		!res2 ||
+		!res3 ||
+		(haveVersion && !res4) ||
 		(haveVersion && !versionBytes.Empty()) ||
 		!inner.ReadASN1(&data, asn1.OCTET_STRING) ||
 		!inner.Empty() {

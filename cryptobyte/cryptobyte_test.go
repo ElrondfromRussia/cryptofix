@@ -328,28 +328,22 @@ func TestWriteWithPendingChild(t *testing.T) {
 	b.AddUint8LengthPrefixed(func(c *Builder) {
 		c.AddUint8LengthPrefixed(func(d *Builder) {
 			func() {
-				defer func() {
-					if recover() == nil {
-						t.Errorf("recover() = nil, want error; c.AddUint8() did not panic")
-					}
-				}()
-				c.AddUint8(2) // panics
-			}()
-
-			defer func() {
-				if recover() == nil {
-					t.Errorf("recover() = nil, want error; b.AddUint8() did not panic")
+				c.AddUint8(2) // errors
+				if c.err == nil {
+					t.Fatal("must have error")
 				}
 			}()
-			b.AddUint8(2) // panics
+
+			b.AddUint8(2) // errors
+			if b.err == nil {
+				t.Fatal("must have error")
+			}
 		})
 
-		defer func() {
-			if recover() == nil {
-				t.Errorf("recover() = nil, want error; b.AddUint8() did not panic")
-			}
-		}()
-		b.AddUint8(2) // panics
+		b.AddUint8(2) // errors
+		if b.err == nil {
+			t.Fatal("must have error")
+		}
 	})
 }
 
@@ -379,12 +373,10 @@ func TestUnwrite(t *testing.T) {
 	}
 
 	func() {
-		defer func() {
-			if recover() == nil {
-				t.Errorf("recover() = nil, want error; b.Unwrite() did not panic")
-			}
-		}()
-		b.Unwrite(4) // panics
+		b.Unwrite(4) // errors
+		if b.err == nil {
+			t.Fatal("must have error")
+		}
 	}()
 
 	b = Builder{}
@@ -392,23 +384,19 @@ func TestUnwrite(t *testing.T) {
 	b.AddUint8LengthPrefixed(func(b *Builder) {
 		b.AddBytes([]byte{1, 2, 3, 4, 5})
 
-		defer func() {
-			if recover() == nil {
-				t.Errorf("recover() = nil, want error; b.Unwrite() did not panic")
-			}
-		}()
-		b.Unwrite(6) // panics
+		b.Unwrite(6) // errors
+		if b.err == nil {
+			t.Fatal("must have error")
+		}
 	})
 
 	b = Builder{}
 	b.AddBytes([]byte{1, 2, 3, 4, 5})
 	b.AddUint8LengthPrefixed(func(c *Builder) {
-		defer func() {
-			if recover() == nil {
-				t.Errorf("recover() = nil, want error; b.Unwrite() did not panic")
-			}
-		}()
-		b.Unwrite(2) // panics (attempted unwrite while child is pending)
+		b.Unwrite(2) // errors (attempted unwrite while child is pending)
+		if b.err == nil {
+			t.Fatal("must have error")
+		}
 	})
 }
 
@@ -468,10 +456,13 @@ func TestASN1Int64(t *testing.T) {
 
 		var n int64
 		s := String(b.BytesOrPanic())
-		ok := s.ReadASN1Integer(&n)
+		ok, err := s.ReadASN1Integer(&n)
 		if !ok || n != tt.in {
 			t.Errorf("s.ReadASN1Integer(&n) = %v, n = %d; want true, n = %d (i = %d)",
 				ok, n, tt.in, i)
+		}
+		if err != nil {
+			t.Fatal(err)
 		}
 		if len(s) != 0 {
 			t.Errorf("len(s) = %d, want 0", len(s))
@@ -504,10 +495,13 @@ func TestASN1Uint64(t *testing.T) {
 
 		var n uint64
 		s := String(b.BytesOrPanic())
-		ok := s.ReadASN1Integer(&n)
+		ok, err := s.ReadASN1Integer(&n)
 		if !ok || n != tt.in {
 			t.Errorf("s.ReadASN1Integer(&n) = %v, n = %d; want true, n = %d (i = %d)",
 				ok, n, tt.in, i)
+		}
+		if err != nil {
+			t.Fatal(err)
 		}
 		if len(s) != 0 {
 			t.Errorf("len(s) = %d, want 0", len(s))
