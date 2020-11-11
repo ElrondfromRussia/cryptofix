@@ -135,7 +135,11 @@ func Sign(privateKey PrivateKey, message []byte) ([]byte, error) {
 		return nil, errors.New("ed25519-bad private key length: " + strconv.Itoa(l))
 	}
 
-	h := sha512.New()
+	h, err := sha512.New()
+	if err != nil {
+		return nil, err
+	}
+
 	h.Write(privateKey[:32])
 
 	var digest1, messageDigest, hramDigest [64]byte
@@ -197,7 +201,11 @@ func Verify(publicKey PublicKey, message, sig []byte) (bool, error) {
 	edwards25519.FeNeg(&A.X, &A.X)
 	edwards25519.FeNeg(&A.T, &A.T)
 
-	h := sha512.New()
+	h, err := sha512.New()
+	if err != nil {
+		return false, err
+	}
+
 	h.Write(sig[:32])
 	h.Write(publicKey[:])
 	h.Write(message)

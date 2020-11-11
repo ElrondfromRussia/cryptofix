@@ -167,7 +167,10 @@ func Sign(rand io.Reader, priv *PrivateKey, hash []byte) (r, s *big.Int, err err
 	}
 
 	// Initialize an SHA-512 hash context; digest ...
-	md := sha512.New()
+	md, err := sha512.New()
+	if err != nil {
+		return
+	}
 	md.Write(priv.D.Bytes()) // the private key,
 	md.Write(entropy)        // the entropy,
 	md.Write(hash)           // and the input hash;

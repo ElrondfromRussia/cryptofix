@@ -79,8 +79,11 @@ var rfc1423Algos = []rfc1423Algo{{
 // deriveKey uses a key derivation function to stretch the password into a key
 // with the number of bits our cipher requires. This algorithm was derived from
 // the OpenSSL source.
-func (c rfc1423Algo) deriveKey(password, salt []byte) []byte {
-	hash := md5.New()
+func (c rfc1423Algo) deriveKey(password, salt []byte) ([]byte, error) {
+	hash, err := md5.New()
+	if err != nil {
+		return nil, err
+	}
 	out := make([]byte, c.keySize)
 	var digest []byte
 
@@ -92,7 +95,7 @@ func (c rfc1423Algo) deriveKey(password, salt []byte) []byte {
 		digest = hash.Sum(digest[:0])
 		copy(out[i:], digest)
 	}
-	return out
+	return out, nil
 }
 
 // IsEncryptedPEMBlock returns if the PEM block is password encrypted.
@@ -138,7 +141,10 @@ func DecryptPEMBlock(b *pem.Block, password []byte) ([]byte, error) {
 
 	// Based on the OpenSSL implementation. The salt is the first 8 bytes
 	// of the initialization vector.
-	key := ciph.deriveKey(password, iv[:8])
+	key, err := ciph.deriveKey(password, iv[:8])
+	if err != nil {
+		return nil, err
+	}
 	block, err := ciph.cipherFunc(key)
 	if err != nil {
 		return nil, err
@@ -153,7 +159,10 @@ func DecryptPEMBlock(b *pem.Block, password []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	dec.CryptBlocks(data, b.Bytes)
+	err = dec.CryptBlocks(data, b.Bytes)
+	if err != nil {
+		return nil, err
+	}
 
 	// Blocks are padded using a scheme where the last n bytes of padding are all
 	// equal to n. It can pad from 1 to blocksize bytes inclusive. See RFC 1423.
@@ -194,7 +203,10 @@ func EncryptPEMBlock(rand io.Reader, blockType string, data, password []byte, al
 	}
 	// The salt is the first 8 bytes of the initialization vector,
 	// matching the key derivation in DecryptPEMBlock.
-	key := ciph.deriveKey(password, iv[:8])
+	key, err := ciph.deriveKey(password, iv[:8])
+	if err != nil {
+		return nil, err
+	}
 	block, err := ciph.cipherFunc(key)
 	if err != nil {
 		return nil, err
@@ -213,7 +225,10 @@ func EncryptPEMBlock(rand io.Reader, blockType string, data, password []byte, al
 	for i := 0; i < pad; i++ {
 		encrypted = append(encrypted, byte(pad))
 	}
-	enc.CryptBlocks(encrypted, encrypted)
+	err = enc.CryptBlocks(encrypted, encrypted)
+	if err != nil {
+		return nil, err
+	}
 
 	return &pem.Block{
 		Type: blockType,
