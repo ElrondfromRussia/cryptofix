@@ -210,31 +210,31 @@ func consumeUint64(b []byte) ([]byte, uint64) {
 }
 
 // New returns a new hash.Hash computing the SHA-512 checksum.
-func New() hash.Hash {
+func New() (hash.Hash, error) {
 	d := &digest{function: cryptofix.SHA512}
 	d.Reset()
-	return d
+	return d, nil
 }
 
 // New512_224 returns a new hash.Hash computing the SHA-512/224 checksum.
-func New512_224() hash.Hash {
+func New512_224() (hash.Hash, error) {
 	d := &digest{function: cryptofix.SHA512_224}
 	d.Reset()
-	return d
+	return d, nil
 }
 
 // New512_256 returns a new hash.Hash computing the SHA-512/256 checksum.
-func New512_256() hash.Hash {
+func New512_256() (hash.Hash, error) {
 	d := &digest{function: cryptofix.SHA512_256}
 	d.Reset()
-	return d
+	return d, nil
 }
 
 // New384 returns a new hash.Hash computing the SHA-384 checksum.
-func New384() hash.Hash {
+func New384() (hash.Hash, error) {
 	d := &digest{function: cryptofix.SHA384}
 	d.Reset()
-	return d
+	return d, nil
 }
 
 func (d *digest) Size() int {

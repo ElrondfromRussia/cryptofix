@@ -159,18 +159,18 @@ func (d *digest) Reset() {
 // also implements encoding.BinaryMarshaler and
 // encoding.BinaryUnmarshaler to marshal and unmarshal the internal
 // state of the hash.
-func New() hash.Hash {
+func New() (hash.Hash, error) {
 	d := new(digest)
 	d.Reset()
-	return d
+	return d, nil
 }
 
 // New224 returns a new hash.Hash computing the SHA224 checksum.
-func New224() hash.Hash {
+func New224() (hash.Hash, error) {
 	d := new(digest)
 	d.is224 = true
 	d.Reset()
-	return d
+	return d, nil
 }
 
 func (d *digest) Size() int {

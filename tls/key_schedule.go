@@ -12,9 +12,9 @@ import (
 	"io"
 	"math/big"
 
-	"golang.org/x/crypto/cryptobyte"
+	"github.com/ElrondfromRussia/cryptofix/cryptobyte"
+	"github.com/ElrondfromRussia/cryptofix/hkdf"
 	"golang.org/x/crypto/curve25519"
-	"golang.org/x/crypto/hkdf"
 )
 
 // This file contains the functions necessary to compute the TLS 1.3 key
@@ -32,7 +32,7 @@ const (
 )
 
 // expandLabel implements HKDF-Expand-Label from RFC 8446, Section 7.1.
-func (c *cipherSuiteTLS13) expandLabel(secret []byte, label string, context []byte, length int) []byte {
+func (c *cipherSuiteTLS13) expandLabel(secret []byte, label string, context []byte, length int) ([]byte, error) {
 	var hkdfLabel cryptobyte.Builder
 	hkdfLabel.AddUint16(uint16(length))
 	hkdfLabel.AddUint8LengthPrefixed(func(b *cryptobyte.Builder) {
@@ -43,23 +43,28 @@ func (c *cipherSuiteTLS13) expandLabel(secret []byte, label string, context []by
 		b.AddBytes(context)
 	})
 	out := make([]byte, length)
+
 	n, err := hkdf.Expand(c.hash.New, secret, hkdfLabel.BytesOrPanic()).Read(out)
 	if err != nil || n != length {
 		panic("tls: HKDF-Expand-Label invocation failed unexpectedly")
 	}
-	return out
+	return out, nil
 }
 
 // deriveSecret implements Derive-Secret from RFC 8446, Section 7.1.
-func (c *cipherSuiteTLS13) deriveSecret(secret []byte, label string, transcript hash.Hash) []byte {
+func (c *cipherSuiteTLS13) deriveSecret(secret []byte, label string, transcript hash.Hash) ([]byte, error) {
 	if transcript == nil {
-		transcript = c.hash.New()
+		var err error
+		transcript, err = c.hash.New()
+		if err != nil {
+			return nil, err
+		}
 	}
 	return c.expandLabel(secret, label, transcript.Sum(nil), c.hash.Size())
 }
 
 // extract implements HKDF-Extract with the cipher suite hash.
-func (c *cipherSuiteTLS13) extract(newSecret, currentSecret []byte) []byte {
+func (c *cipherSuiteTLS13) extract(newSecret, currentSecret []byte) ([]byte, error) {
 	if newSecret == nil {
 		newSecret = make([]byte, c.hash.Size())
 	}
@@ -68,37 +73,52 @@ func (c *cipherSuiteTLS13) extract(newSecret, currentSecret []byte) []byte {
 
 // nextTrafficSecret generates the next traffic secret, given the current one,
 // according to RFC 8446, Section 7.2.
-func (c *cipherSuiteTLS13) nextTrafficSecret(trafficSecret []byte) []byte {
+func (c *cipherSuiteTLS13) nextTrafficSecret(trafficSecret []byte) ([]byte, error) {
 	return c.expandLabel(trafficSecret, trafficUpdateLabel, nil, c.hash.Size())
 }
 
 // trafficKey generates traffic keys according to RFC 8446, Section 7.3.
-func (c *cipherSuiteTLS13) trafficKey(trafficSecret []byte) (key, iv []byte) {
-	key = c.expandLabel(trafficSecret, "key", nil, c.keyLen)
-	iv = c.expandLabel(trafficSecret, "iv", nil, aeadNonceLength)
+func (c *cipherSuiteTLS13) trafficKey(trafficSecret []byte) (key, iv []byte, err error) {
+	key, err = c.expandLabel(trafficSecret, "key", nil, c.keyLen)
+	iv, err = c.expandLabel(trafficSecret, "iv", nil, aeadNonceLength)
 	return
 }
 
 // finishedHash generates the Finished verify_data or PskBinderEntry according
 // to RFC 8446, Section 4.4.4. See sections 4.4 and 4.2.11.2 for the baseKey
 // selection.
-func (c *cipherSuiteTLS13) finishedHash(baseKey []byte, transcript hash.Hash) []byte {
-	finishedKey := c.expandLabel(baseKey, "finished", nil, c.hash.Size())
-	verifyData := hmac.New(c.hash.New, finishedKey)
+func (c *cipherSuiteTLS13) finishedHash(baseKey []byte, transcript hash.Hash) ([]byte, error) {
+	finishedKey, err := c.expandLabel(baseKey, "finished", nil, c.hash.Size())
+	if err != nil {
+		return nil, err
+	}
+	verifyData, err := hmac.New(c.hash.New, finishedKey)
+	if err != nil {
+		return nil, err
+	}
 	verifyData.Write(transcript.Sum(nil))
-	return verifyData.Sum(nil)
+	return verifyData.Sum(nil), err
 }
 
 // exportKeyingMaterial implements RFC5705 exporters for TLS 1.3 according to
 // RFC 8446, Section 7.5.
-func (c *cipherSuiteTLS13) exportKeyingMaterial(masterSecret []byte, transcript hash.Hash) func(string, []byte, int) ([]byte, error) {
-	expMasterSecret := c.deriveSecret(masterSecret, exporterLabel, transcript)
+func (c *cipherSuiteTLS13) exportKeyingMaterial(masterSecret []byte, transcript hash.Hash) (func(string, []byte, int) ([]byte, error), error) {
+	expMasterSecret, err := c.deriveSecret(masterSecret, exporterLabel, transcript)
+	if err != nil {
+		return nil, err
+	}
 	return func(label string, context []byte, length int) ([]byte, error) {
-		secret := c.deriveSecret(expMasterSecret, label, nil)
-		h := c.hash.New()
+		secret, err := c.deriveSecret(expMasterSecret, label, nil)
+		if err != nil {
+			return nil, err
+		}
+		h, err := c.hash.New()
+		if err != nil {
+			return nil, err
+		}
 		h.Write(context)
 		return c.expandLabel(secret, "exporter", h.Sum(nil), length), nil
-	}
+	}, nil
 }
 
 // ecdheParameters implements Diffie-Hellman with either NIST curves or X25519,

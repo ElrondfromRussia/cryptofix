@@ -67,10 +67,17 @@ func (h *hmac) Reset() {
 // Note that unlike other hash implementations in the standard library,
 // the returned Hash does not implement encoding.BinaryMarshaler
 // or encoding.BinaryUnmarshaler.
-func New(h func() hash.Hash, key []byte) hash.Hash {
+func New(h func() (hash.Hash, error), key []byte) (hash.Hash, error) {
 	hm := new(hmac)
-	hm.outer = h()
-	hm.inner = h()
+	var err error
+	hm.outer, err = h()
+	if err != nil {
+		return nil, err
+	}
+	hm.inner, err = h()
+	if err != nil {
+		return nil, err
+	}
 	hm.size = hm.inner.Size()
 	hm.blocksize = hm.inner.BlockSize()
 	hm.ipad = make([]byte, hm.blocksize)
@@ -89,7 +96,7 @@ func New(h func() hash.Hash, key []byte) hash.Hash {
 		hm.opad[i] ^= 0x5c
 	}
 	hm.inner.Write(hm.ipad)
-	return hm
+	return hm, nil
 }
 
 // Equal compares two MACs for equality without leaking timing information.

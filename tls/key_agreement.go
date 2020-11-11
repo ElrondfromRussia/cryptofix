@@ -105,26 +105,29 @@ func md5SHA1Hash(slices [][]byte) []byte {
 // using the given hash function (for >= TLS 1.2) or using a default based on
 // the sigType (for earlier TLS versions). For Ed25519 signatures, which don't
 // do pre-hashing, it returns the concatenation of the slices.
-func hashForServerKeyExchange(sigType uint8, hashFunc cryptofix.Hash, version uint16, slices ...[]byte) []byte {
+func hashForServerKeyExchange(sigType uint8, hashFunc cryptofix.Hash, version uint16, slices ...[]byte) ([]byte, error) {
 	if sigType == signatureEd25519 {
 		var signed []byte
 		for _, slice := range slices {
 			signed = append(signed, slice...)
 		}
-		return signed
+		return signed, nil
 	}
 	if version >= VersionTLS12 {
-		h := hashFunc.New()
+		h, err := hashFunc.New()
+		if err != nil {
+			return nil, err
+		}
 		for _, slice := range slices {
 			h.Write(slice)
 		}
 		digest := h.Sum(nil)
-		return digest
+		return digest, nil
 	}
 	if sigType == signatureECDSA {
-		return sha1Hash(slices)
+		return sha1Hash(slices), nil
 	}
-	return md5SHA1Hash(slices)
+	return md5SHA1Hash(slices), nil
 }
 
 // ecdheKeyAgreement implements a TLS key agreement where the server
@@ -200,7 +203,10 @@ func (ka *ecdheKeyAgreement) generateServerKeyExchange(config *Config, cert *Cer
 		return nil, errors.New("tls: certificate cannot be used with the selected cipher suite")
 	}
 
-	signed := hashForServerKeyExchange(sigType, sigHash, ka.version, clientHello.random, hello.random, serverECDHEParams)
+	signed, err := hashForServerKeyExchange(sigType, sigHash, ka.version, clientHello.random, hello.random, serverECDHEParams)
+	if err != nil {
+		return nil, err
+	}
 
 	signOpts := cryptofix.SignerOpts(sigHash)
 	if sigType == signatureRSAPSS {
@@ -318,7 +324,10 @@ func (ka *ecdheKeyAgreement) processServerKeyExchange(config *Config, clientHell
 	}
 	sig = sig[2:]
 
-	signed := hashForServerKeyExchange(sigType, sigHash, ka.version, clientHello.random, serverHello.random, serverECDHEParams)
+	signed, err := hashForServerKeyExchange(sigType, sigHash, ka.version, clientHello.random, serverHello.random, serverECDHEParams)
+	if err != nil {
+		return err
+	}
 	if err := verifyHandshakeSignature(sigType, cert.PublicKey, sigHash, signed, sig); err != nil {
 		return errors.New("tls: invalid signature by the server certificate: " + err.Error())
 	}

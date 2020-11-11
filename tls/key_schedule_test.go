@@ -32,7 +32,10 @@ func parseVector(v string) []byte {
 }
 
 func TestDeriveSecret(t *testing.T) {
-	chTranscript := cipherSuitesTLS13[0].hash.New()
+	chTranscript, err := cipherSuitesTLS13[0].hash.New()
+	if err != nil {
+		t.Fatal(err)
+	}
 	chTranscript.Write(parseVector(`
 	payload (512 octets):  01 00 01 fc 03 03 1b c3 ce b6 bb e3 9c ff
 	93 83 55 b5 a5 0a db 6d b2 1b 7a 6a f6 49 d7 b4 bc 41 9d 78 76
@@ -96,7 +99,8 @@ func TestDeriveSecret(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := cipherSuitesTLS13[0]
-			if got := c.deriveSecret(tt.args.secret, tt.args.label, tt.args.transcript); !bytes.Equal(got, tt.want) {
+			if got, err := c.deriveSecret(tt.args.secret, tt.args.label, tt.args.transcript); !bytes.Equal(got, tt.want) ||
+				err != nil {
 				t.Errorf("cipherSuiteTLS13.deriveSecret() = % x, want % x", got, tt.want)
 			}
 		})
@@ -114,7 +118,10 @@ func TestTrafficKey(t *testing.T) {
 		`iv expanded (12 octets):  5d 31 3e b2 67 12 76 ee 13 00 0b 30`)
 
 	c := cipherSuitesTLS13[0]
-	gotKey, gotIV := c.trafficKey(trafficSecret)
+	gotKey, gotIV, err := c.trafficKey(trafficSecret)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !bytes.Equal(gotKey, wantKey) {
 		t.Errorf("cipherSuiteTLS13.trafficKey() gotKey = % x, want % x", gotKey, wantKey)
 	}
@@ -167,7 +174,7 @@ func TestExtract(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := cipherSuitesTLS13[0]
-			if got := c.extract(tt.args.newSecret, tt.args.currentSecret); !bytes.Equal(got, tt.want) {
+			if got, err := c.extract(tt.args.newSecret, tt.args.currentSecret); !bytes.Equal(got, tt.want) || err != nil {
 				t.Errorf("cipherSuiteTLS13.extract() = % x, want % x", got, tt.want)
 			}
 		})

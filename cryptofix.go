@@ -78,7 +78,7 @@ func (h Hash) Size() (int, error) {
 	return 0, errors.New("crypto-size of unknown hash function")
 }
 
-var hashes = make([]func() hash.Hash, maxHash)
+var hashes = make([]func() (hash.Hash, error), maxHash)
 
 // New returns a new hash.Hash calculating the given hash function. New panics
 // if the hash function is not linked into the binary.
@@ -86,7 +86,11 @@ func (h Hash) New() (hash.Hash, error) {
 	if h > 0 && h < maxHash {
 		f := hashes[h]
 		if f != nil {
-			return f(), nil
+			ff, err := f()
+			if err != nil {
+				return nil, err
+			}
+			return ff, nil
 		}
 	}
 	return nil, errors.New("crypto: requested hash function #" + strconv.Itoa(int(h)) + " is unavailable")
@@ -100,7 +104,7 @@ func (h Hash) Available() bool {
 // RegisterHash registers a function that returns a new instance of the given
 // hash function. This is intended to be called from the init function in
 // packages that implement hash functions.
-func RegisterHash(h Hash, f func() hash.Hash) error {
+func RegisterHash(h Hash, f func() (hash.Hash, error)) error {
 	if h >= maxHash {
 		return errors.New("crypto-registerHash of unknown hash function")
 	}
