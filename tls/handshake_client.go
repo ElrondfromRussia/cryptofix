@@ -400,7 +400,10 @@ func (hs *clientHandshakeState) handshake() error {
 		return err
 	}
 
-	hs.finishedHash = newFinishedHash(c.vers, hs.suite)
+	hs.finishedHash, err = newFinishedHash(c.vers, hs.suite)
+	if err != nil {
+		return err
+	}
 
 	// No signatures of the handshake are needed in a resumption.
 	// Otherwise, in a full handshake, if we don't have any certificates
@@ -674,7 +677,10 @@ func (hs *clientHandshakeState) doFullHandshake() error {
 			}
 		}
 
-		signed := hs.finishedHash.hashForClientCertificate(sigType, sigHash, hs.masterSecret)
+		signed, err := hs.finishedHash.hashForClientCertificate(sigType, sigHash, hs.masterSecret)
+		if err != nil {
+			return err
+		}
 		signOpts := cryptofix.SignerOpts(sigHash)
 		if sigType == signatureRSAPSS {
 			signOpts = &rsa.PSSOptions{SaltLength: rsa.PSSSaltLengthEqualsHash, Hash: sigHash}

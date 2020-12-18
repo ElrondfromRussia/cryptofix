@@ -24,8 +24,11 @@ func splitPreMasterSecret(secret []byte) (s1, s2 []byte) {
 }
 
 // pHash implements the P_hash function, as defined in RFC 4346, Section 5.
-func pHash(result, secret, seed []byte, hash func() hash.Hash) {
-	h := hmac.New(hash, secret)
+func pHash(result, secret, seed []byte, hash func() (hash.Hash, error)) error {
+	h, err := hmac.New(hash, secret)
+	if err != nil {
+		return err
+	}
 	h.Write(seed)
 	a := h.Sum(nil)
 
@@ -42,6 +45,7 @@ func pHash(result, secret, seed []byte, hash func() hash.Hash) {
 		h.Write(a)
 		a = h.Sum(nil)
 	}
+	return nil
 }
 
 // prf10 implements the TLS 1.0 pseudo-random function, as defined in RFC 2246, Section 5.
@@ -64,7 +68,7 @@ func prf10(result, secret, label, seed []byte) {
 }
 
 // prf12 implements the TLS 1.2 pseudo-random function, as defined in RFC 5246, Section 5.
-func prf12(hashFunc func() hash.Hash) func(result, secret, label, seed []byte) {
+func prf12(hashFunc func() (hash.Hash, error)) func(result, secret, label, seed []byte) {
 	return func(result, secret, label, seed []byte) {
 		labelAndSeed := make([]byte, len(label)+len(seed))
 		copy(labelAndSeed, label)
@@ -140,18 +144,46 @@ func keysFromMasterSecret(version uint16, suite *cipherSuite, masterSecret, clie
 	return
 }
 
-func newFinishedHash(version uint16, cipherSuite *cipherSuite) finishedHash {
+func newFinishedHash(version uint16, cipherSuite *cipherSuite) (finishedHash, error) {
 	var buffer []byte
+	var err error
 	if version >= VersionTLS12 {
 		buffer = []byte{}
 	}
 
-	prf, hash := prfAndHashForVersion(version, cipherSuite)
-	if hash != 0 {
-		return finishedHash{hash.New(), hash.New(), nil, nil, buffer, version, prf}
+	prf, hashP := prfAndHashForVersion(version, cipherSuite)
+
+	hashCli, err := hashP.New()
+	if err != nil {
+		return finishedHash{}, err
+	}
+	hashServ, err := hashP.New()
+	if err != nil {
+		return finishedHash{}, err
+	}
+	if hashP != 0 {
+		return finishedHash{hashCli, hashServ, nil, nil, buffer, version, prf}, nil
 	}
 
-	return finishedHash{sha1.New(), sha1.New(), md5.New(), md5.New(), buffer, version, prf}
+	shaCli, err := sha1.New()
+	if err != nil {
+		return finishedHash{}, err
+	}
+	shaServ, err := sha1.New()
+	if err != nil {
+		return finishedHash{}, err
+	}
+
+	md5Cli, err := md5.New()
+	if err != nil {
+		return finishedHash{}, err
+	}
+	md5Serv, err := md5.New()
+	if err != nil {
+		return finishedHash{}, err
+	}
+
+	return finishedHash{shaCli, shaServ, md5Cli, md5Serv, buffer, version, prf}, nil
 }
 
 // A finishedHash calculates the hash of a set of handshake messages suitable
@@ -215,26 +247,29 @@ func (h finishedHash) serverSum(masterSecret []byte) []byte {
 
 // hashForClientCertificate returns the handshake messages so far, pre-hashed if
 // necessary, suitable for signing by a TLS client certificate.
-func (h finishedHash) hashForClientCertificate(sigType uint8, hashAlg cryptofix.Hash, masterSecret []byte) []byte {
+func (h finishedHash) hashForClientCertificate(sigType uint8, hashAlg cryptofix.Hash, masterSecret []byte) ([]byte, error) {
 	if (h.version >= VersionTLS12 || sigType == signatureEd25519) && h.buffer == nil {
-		panic("tls: handshake hash for a client certificate requested after discarding the handshake buffer")
+		return nil, errors.New("tls: handshake hash for a client certificate requested after discarding the handshake buffer")
 	}
 
 	if sigType == signatureEd25519 {
-		return h.buffer
+		return h.buffer, nil
 	}
 
 	if h.version >= VersionTLS12 {
-		hash := hashAlg.New()
+		hash, err := hashAlg.New()
+		if err != nil {
+			return nil, err
+		}
 		hash.Write(h.buffer)
-		return hash.Sum(nil)
+		return hash.Sum(nil), nil
 	}
 
 	if sigType == signatureECDSA {
-		return h.server.Sum(nil)
+		return h.server.Sum(nil), nil
 	}
 
-	return h.Sum()
+	return h.Sum(), nil
 }
 
 // discardHandshakeBuffer is called when there is no more need to

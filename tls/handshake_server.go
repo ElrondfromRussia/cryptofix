@@ -406,13 +406,17 @@ func (hs *serverHandshakeState) checkForResumption() bool {
 
 func (hs *serverHandshakeState) doResumeHandshake() error {
 	c := hs.c
+	var err error
 
 	hs.hello.cipherSuite = hs.suite.id
 	// We echo the client's session ID in the ServerHello to let it know
 	// that we're doing a resumption.
 	hs.hello.sessionId = hs.clientHello.sessionId
 	hs.hello.ticketSupported = hs.sessionState.usedOldKey
-	hs.finishedHash = newFinishedHash(c.vers, hs.suite)
+	hs.finishedHash, err = newFinishedHash(c.vers, hs.suite)
+	if err != nil {
+		return err
+	}
 	hs.finishedHash.discardHandshakeBuffer()
 	clHel, err := hs.clientHello.marshal()
 	if err != nil {
@@ -453,7 +457,11 @@ func (hs *serverHandshakeState) doFullHandshake() error {
 	hs.hello.ticketSupported = hs.clientHello.ticketSupported && !c.config.SessionTicketsDisabled
 	hs.hello.cipherSuite = hs.suite.id
 
-	hs.finishedHash = newFinishedHash(hs.c.vers, hs.suite)
+	var err error
+	hs.finishedHash, err = newFinishedHash(hs.c.vers, hs.suite)
+	if err != nil {
+		return err
+	}
 	if c.config.ClientAuth == NoClientCert {
 		// No need to keep a full record of the handshake if client
 		// certificates won't be used.
@@ -678,7 +686,10 @@ func (hs *serverHandshakeState) doFullHandshake() error {
 			}
 		}
 
-		signed := hs.finishedHash.hashForClientCertificate(sigType, sigHash, hs.masterSecret)
+		signed, err := hs.finishedHash.hashForClientCertificate(sigType, sigHash, hs.masterSecret)
+		if err != nil {
+			return err
+		}
 		if err := verifyHandshakeSignature(sigType, pub, sigHash, signed, certVerify.signature); err != nil {
 			_ = c.sendAlert(alertDecryptError)
 			return errors.New("tls: invalid signature by the client certificate: " + err.Error())

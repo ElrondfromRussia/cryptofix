@@ -55,7 +55,7 @@ func TestMarshalUnmarshal(t *testing.T) {
 			}
 
 			m1 := v.Interface().(handshakeMessage)
-			marshaled := m1.marshal()
+			marshaled, _ := m1.marshal()
 			m2 := iface.(handshakeMessage)
 			if !m2.unmarshal(marshaled) {
 				t.Errorf("#%d failed to unmarshal %#v %x", i, m1, marshaled)
@@ -414,7 +414,7 @@ func TestRejectEmptySCTList(t *testing.T) {
 		random: random[:],
 		scts:   [][]byte{sct},
 	}
-	serverHelloBytes := serverHello.marshal()
+	serverHelloBytes, _ := serverHello.marshal()
 
 	var serverHelloCopy serverHelloMsg
 	if !serverHelloCopy.unmarshal(serverHelloBytes) {
@@ -457,7 +457,7 @@ func TestRejectEmptySCT(t *testing.T) {
 		random: random[:],
 		scts:   [][]byte{nil},
 	}
-	serverHelloBytes := serverHello.marshal()
+	serverHelloBytes, _ := serverHello.marshal()
 
 	var serverHelloCopy serverHelloMsg
 	if serverHelloCopy.unmarshal(serverHelloBytes) {

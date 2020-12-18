@@ -1396,7 +1396,7 @@ func TestServerSelectingUnconfiguredCipherSuite(t *testing.T) {
 		random:      make([]byte, 32),
 		cipherSuite: TLS_RSA_WITH_AES_256_GCM_SHA384,
 	}
-	serverHelloBytes := serverHello.marshal()
+	serverHelloBytes, _ := serverHello.marshal()
 
 	s.Write([]byte{
 		byte(recordTypeHandshake),

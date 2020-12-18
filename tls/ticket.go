@@ -9,10 +9,10 @@ import (
 	"errors"
 	"github.com/ElrondfromRussia/cryptofix/aes"
 	"github.com/ElrondfromRussia/cryptofix/cipher"
+	"github.com/ElrondfromRussia/cryptofix/cryptobyte"
 	"github.com/ElrondfromRussia/cryptofix/hmac"
 	"github.com/ElrondfromRussia/cryptofix/sha256"
 	"github.com/ElrondfromRussia/cryptofix/subtle"
-	"golang.org/x/crypto/cryptobyte"
 	"io"
 )
 
@@ -162,9 +162,16 @@ func (c *Conn) encryptTicket(state []byte) ([]byte, error) {
 	if err != nil {
 		return nil, errors.New("tls: failed to create cipher while encrypting ticket: " + err.Error())
 	}
-	cipher.NewCTR(block, iv).XORKeyStream(encrypted[ticketKeyNameLen+aes.BlockSize:], state)
+	NewCtr, err := cipher.NewCTR(block, iv)
+	if err != nil {
+		return nil, err
+	} /**/
+	NewCtr.XORKeyStream(encrypted[ticketKeyNameLen+aes.BlockSize:], state)
 
-	mac := hmac.New(sha256.New, key.hmacKey[:])
+	mac, err := hmac.New(sha256.New, key.hmacKey[:])
+	if err != nil {
+		return nil, err
+	}
 	mac.Write(encrypted[:len(encrypted)-sha256.Size])
 	mac.Sum(macBytes[:0])
 
@@ -195,7 +202,10 @@ func (c *Conn) decryptTicket(encrypted []byte) (plaintext []byte, usedOldKey boo
 	}
 	key := &keys[keyIndex]
 
-	mac := hmac.New(sha256.New, key.hmacKey[:])
+	mac, err := hmac.New(sha256.New, key.hmacKey[:])
+	if err != nil {
+		return nil, false
+	}
 	mac.Write(encrypted[:len(encrypted)-sha256.Size])
 	expected := mac.Sum(nil)
 
@@ -208,7 +218,11 @@ func (c *Conn) decryptTicket(encrypted []byte) (plaintext []byte, usedOldKey boo
 		return nil, false
 	}
 	plaintext = make([]byte, len(ciphertext))
-	cipher.NewCTR(block, iv).XORKeyStream(plaintext, ciphertext)
+	newCtr, err := cipher.NewCTR(block, iv)
+	if err != nil {
+		return nil, false
+	}
+	newCtr.XORKeyStream(plaintext, ciphertext)
 
 	return plaintext, keyIndex > 0
 }

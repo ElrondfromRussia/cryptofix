@@ -80,25 +80,35 @@ func (ka rsaKeyAgreement) generateClientKeyExchange(config *Config, clientHello 
 }
 
 // sha1Hash calculates a SHA1 hash over the given byte slices.
-func sha1Hash(slices [][]byte) []byte {
-	hsha1 := sha1.New()
+func sha1Hash(slices [][]byte) ([]byte, error) {
+	hsha1, err := sha1.New()
+	if err != nil {
+		return nil, err
+	}
 	for _, slice := range slices {
 		hsha1.Write(slice)
 	}
-	return hsha1.Sum(nil)
+	return hsha1.Sum(nil), nil
 }
 
 // md5SHA1Hash implements TLS 1.0's hybrid hash function which consists of the
 // concatenation of an MD5 and SHA1 hash.
-func md5SHA1Hash(slices [][]byte) []byte {
+func md5SHA1Hash(slices [][]byte) ([]byte, error) {
 	md5sha1 := make([]byte, md5.Size+sha1.Size)
-	hmd5 := md5.New()
+	hmd5, err := md5.New()
+	if err != nil {
+		return nil, err
+	}
 	for _, slice := range slices {
 		hmd5.Write(slice)
 	}
 	copy(md5sha1, hmd5.Sum(nil))
-	copy(md5sha1[md5.Size:], sha1Hash(slices))
-	return md5sha1
+	sh1H, err := sha1Hash(slices)
+	if err != nil {
+		return nil, err
+	}
+	copy(md5sha1[md5.Size:], sh1H)
+	return md5sha1, nil
 }
 
 // hashForServerKeyExchange hashes the given slices and returns their digest
@@ -125,9 +135,9 @@ func hashForServerKeyExchange(sigType uint8, hashFunc cryptofix.Hash, version ui
 		return digest, nil
 	}
 	if sigType == signatureECDSA {
-		return sha1Hash(slices), nil
+		return sha1Hash(slices)
 	}
-	return md5SHA1Hash(slices), nil
+	return md5SHA1Hash(slices)
 }
 
 // ecdheKeyAgreement implements a TLS key agreement where the server

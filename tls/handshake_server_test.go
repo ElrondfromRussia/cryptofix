@@ -33,7 +33,8 @@ func testClientHelloFailure(t *testing.T, serverConfig *Config, m handshakeMessa
 		if ch, ok := m.(*clientHelloMsg); ok {
 			cli.vers = ch.vers
 		}
-		cli.writeRecord(recordTypeHandshake, m.marshal())
+		mrs, _ := m.marshal()
+		cli.writeRecord(recordTypeHandshake, mrs)
 		c.Close()
 	}()
 	conn := Server(s, serverConfig)
@@ -188,7 +189,8 @@ func TestRenegotiationExtension(t *testing.T) {
 	go func() {
 		cli := Client(c, testConfig)
 		cli.vers = clientHello.vers
-		cli.writeRecord(recordTypeHandshake, clientHello.marshal())
+		mrs, _ := clientHello.marshal()
+		cli.writeRecord(recordTypeHandshake, mrs)
 
 		buf := make([]byte, 1024)
 		n, err := c.Read(buf)
@@ -247,7 +249,8 @@ func TestTLS12OnlyCipherSuites(t *testing.T) {
 	go func() {
 		cli := Client(c, testConfig)
 		cli.vers = clientHello.vers
-		cli.writeRecord(recordTypeHandshake, clientHello.marshal())
+		mrs, _ := clientHello.marshal()
+		cli.writeRecord(recordTypeHandshake, mrs)
 		reply, err := cli.readHandshake()
 		c.Close()
 		if err != nil {
@@ -302,7 +305,8 @@ func TestTLSPointFormats(t *testing.T) {
 			go func() {
 				cli := Client(c, testConfig)
 				cli.vers = clientHello.vers
-				cli.writeRecord(recordTypeHandshake, clientHello.marshal())
+				mrs, _ := clientHello.marshal()
+				cli.writeRecord(recordTypeHandshake, mrs)
 				reply, err := cli.readHandshake()
 				c.Close()
 				if err != nil {
@@ -1412,7 +1416,8 @@ func TestSNIGivenOnFailure(t *testing.T) {
 	go func() {
 		cli := Client(c, testConfig)
 		cli.vers = clientHello.vers
-		cli.writeRecord(recordTypeHandshake, clientHello.marshal())
+		mrs, _ := clientHello.marshal()
+		cli.writeRecord(recordTypeHandshake, mrs)
 		c.Close()
 	}()
 	conn := Server(s, serverConfig)
@@ -1597,7 +1602,10 @@ func TestCloseServerConnectionOnIdleClient(t *testing.T) {
 }
 
 func TestCloneHash(t *testing.T) {
-	h1 := cryptofix.SHA256.New()
+	h1, err := cryptofix.SHA256.New()
+	if err != nil {
+		t.Fatal(err)
+	}
 	h1.Write([]byte("test"))
 	s1 := h1.Sum(nil)
 	h2 := cloneHash(h1, cryptofix.SHA256)
