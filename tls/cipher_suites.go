@@ -250,13 +250,15 @@ func cipherAES(key, iv []byte, isRead bool) (interface{}, error) {
 
 // macSHA1 returns a macFunction for the given protocol version.
 func macSHA1(version uint16, key []byte) macFunction {
-	return tls10MAC{h: hmac.New(newConstantTimeHash(sha1.New), key)}
+	hmacNew, _ := hmac.New(newConstantTimeHash(sha1.New), key)
+	return tls10MAC{h: hmacNew}
 }
 
 // macSHA256 returns a SHA-256 based MAC. These are only supported in TLS 1.2
 // so the given version is ignored.
 func macSHA256(version uint16, key []byte) macFunction {
-	return tls10MAC{h: hmac.New(sha256.New, key)}
+	hmacNew, _ := hmac.New(sha256.New, key)
+	return tls10MAC{h: hmacNew}
 }
 
 type macFunction interface {
@@ -409,9 +411,13 @@ func (c *cthWrapper) Reset()                      { c.h.Reset() }
 func (c *cthWrapper) Write(p []byte) (int, error) { return c.h.Write(p) }
 func (c *cthWrapper) Sum(b []byte) []byte         { return c.h.ConstantTimeSum(b) }
 
-func newConstantTimeHash(h func() hash.Hash) func() hash.Hash {
-	return func() hash.Hash {
-		return &cthWrapper{h().(constantTimeHash)}
+func newConstantTimeHash(h func() (hash.Hash, error)) func() (hash.Hash, error) {
+	return func() (hash.Hash, error) {
+		hH, err := h()
+		if err != nil {
+			return nil, err
+		}
+		return &cthWrapper{hH.(constantTimeHash)}, nil
 	}
 }
 

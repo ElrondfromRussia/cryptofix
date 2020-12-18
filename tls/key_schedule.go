@@ -44,9 +44,13 @@ func (c *cipherSuiteTLS13) expandLabel(secret []byte, label string, context []by
 	})
 	out := make([]byte, length)
 
-	n, err := hkdf.Expand(c.hash.New, secret, hkdfLabel.BytesOrPanic()).Read(out)
+	res, err := hkdf.Expand(c.hash.New, secret, hkdfLabel.BytesOrPanic())
+	if err != nil {
+		return nil, err
+	}
+	n, err := res.Read(out)
 	if err != nil || n != length {
-		panic("tls: HKDF-Expand-Label invocation failed unexpectedly")
+		return nil, errors.New("tls: HKDF-Expand-Label invocation failed unexpectedly")
 	}
 	return out, nil
 }
@@ -60,13 +64,21 @@ func (c *cipherSuiteTLS13) deriveSecret(secret []byte, label string, transcript 
 			return nil, err
 		}
 	}
-	return c.expandLabel(secret, label, transcript.Sum(nil), c.hash.Size())
+	Hsz, err := c.hash.Size()
+	if err != nil {
+		return nil, err
+	}
+	return c.expandLabel(secret, label, transcript.Sum(nil), Hsz)
 }
 
 // extract implements HKDF-Extract with the cipher suite hash.
 func (c *cipherSuiteTLS13) extract(newSecret, currentSecret []byte) ([]byte, error) {
 	if newSecret == nil {
-		newSecret = make([]byte, c.hash.Size())
+		Hsz, err := c.hash.Size()
+		if err != nil {
+			return nil, err
+		}
+		newSecret = make([]byte, Hsz)
 	}
 	return hkdf.Extract(c.hash.New, newSecret, currentSecret)
 }
@@ -74,7 +86,11 @@ func (c *cipherSuiteTLS13) extract(newSecret, currentSecret []byte) ([]byte, err
 // nextTrafficSecret generates the next traffic secret, given the current one,
 // according to RFC 8446, Section 7.2.
 func (c *cipherSuiteTLS13) nextTrafficSecret(trafficSecret []byte) ([]byte, error) {
-	return c.expandLabel(trafficSecret, trafficUpdateLabel, nil, c.hash.Size())
+	Hsz, err := c.hash.Size()
+	if err != nil {
+		return nil, err
+	}
+	return c.expandLabel(trafficSecret, trafficUpdateLabel, nil, Hsz)
 }
 
 // trafficKey generates traffic keys according to RFC 8446, Section 7.3.
@@ -88,7 +104,11 @@ func (c *cipherSuiteTLS13) trafficKey(trafficSecret []byte) (key, iv []byte, err
 // to RFC 8446, Section 4.4.4. See sections 4.4 and 4.2.11.2 for the baseKey
 // selection.
 func (c *cipherSuiteTLS13) finishedHash(baseKey []byte, transcript hash.Hash) ([]byte, error) {
-	finishedKey, err := c.expandLabel(baseKey, "finished", nil, c.hash.Size())
+	Hsz, err := c.hash.Size()
+	if err != nil {
+		return nil, err
+	}
+	finishedKey, err := c.expandLabel(baseKey, "finished", nil, Hsz)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +137,11 @@ func (c *cipherSuiteTLS13) exportKeyingMaterial(masterSecret []byte, transcript 
 			return nil, err
 		}
 		h.Write(context)
-		return c.expandLabel(secret, "exporter", h.Sum(nil), length), nil
+		res, err := c.expandLabel(secret, "exporter", h.Sum(nil), length)
+		if err != nil {
+			return nil, err
+		}
+		return res, nil
 	}, nil
 }
 

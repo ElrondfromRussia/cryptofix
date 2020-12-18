@@ -266,7 +266,11 @@ func (hs *clientHandshakeStateTLS13) processHelloRetryRequest() error {
 				return err
 			}
 			transcript.Write(resMursh)
-			pskBinders := [][]byte{hs.suite.finishedHash(hs.binderKey, transcript)}
+			finHash, err := hs.suite.finishedHash(hs.binderKey, transcript)
+			if err != nil {
+				return err
+			}
+			pskBinders := [][]byte{finHash}
 			//TODO: think, not sure about that
 			hs.hello.updateBinders(pskBinders)
 		} else {
@@ -373,20 +377,36 @@ func (hs *clientHandshakeStateTLS13) establishHandshakeKeys() error {
 	}
 
 	earlySecret := hs.earlySecret
+	var err error
 	if !hs.usingPSK {
-		earlySecret = hs.suite.extract(nil, nil)
+		earlySecret, err = hs.suite.extract(nil, nil)
+		if err != nil {
+			return err
+		}
 	}
-	handshakeSecret := hs.suite.extract(sharedKey,
-		hs.suite.deriveSecret(earlySecret, "derived", nil))
-
-	clientSecret := hs.suite.deriveSecret(handshakeSecret,
-		clientHandshakeTrafficLabel, hs.transcript)
-	err := c.out.setTrafficSecret(hs.suite, clientSecret)
+	derSecret, err := hs.suite.deriveSecret(earlySecret, "derived", nil)
 	if err != nil {
 		return err
 	}
-	serverSecret := hs.suite.deriveSecret(handshakeSecret,
+	handshakeSecret, err := hs.suite.extract(sharedKey, derSecret)
+	if err != nil {
+		return err
+	}
+
+	clientSecret, err := hs.suite.deriveSecret(handshakeSecret,
+		clientHandshakeTrafficLabel, hs.transcript)
+	if err != nil {
+		return err
+	}
+	err = c.out.setTrafficSecret(hs.suite, clientSecret)
+	if err != nil {
+		return err
+	}
+	serverSecret, err := hs.suite.deriveSecret(handshakeSecret,
 		serverHandshakeTrafficLabel, hs.transcript)
+	if err != nil {
+		return err
+	}
 	err = c.in.setTrafficSecret(hs.suite, serverSecret)
 	if err != nil {
 		return err
@@ -402,9 +422,14 @@ func (hs *clientHandshakeStateTLS13) establishHandshakeKeys() error {
 		_ = c.sendAlert(alertInternalError)
 		return err
 	}
-
-	hs.masterSecret = hs.suite.extract(nil,
-		hs.suite.deriveSecret(handshakeSecret, "derived", nil))
+	derSecret, err = hs.suite.deriveSecret(handshakeSecret, "derived", nil)
+	if err != nil {
+		return err
+	}
+	hs.masterSecret, err = hs.suite.extract(nil, derSecret)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -546,7 +571,10 @@ func (hs *clientHandshakeStateTLS13) readServerFinished() error {
 		return unexpectedMessageError(finished, msg)
 	}
 
-	expectedMAC := hs.suite.finishedHash(c.in.trafficSecret, hs.transcript)
+	expectedMAC, err := hs.suite.finishedHash(c.in.trafficSecret, hs.transcript)
+	if err != nil {
+		return err
+	}
 	if !hmac.Equal(expectedMAC, finished.verifyData) {
 		_ = c.sendAlert(alertDecryptError)
 		return errors.New("tls: invalid server finished hash")
@@ -560,10 +588,16 @@ func (hs *clientHandshakeStateTLS13) readServerFinished() error {
 
 	// Derive secrets that take context through the server Finished.
 
-	hs.trafficSecret = hs.suite.deriveSecret(hs.masterSecret,
+	hs.trafficSecret, err = hs.suite.deriveSecret(hs.masterSecret,
 		clientApplicationTrafficLabel, hs.transcript)
-	serverSecret := hs.suite.deriveSecret(hs.masterSecret,
+	if err != nil {
+		return err
+	}
+	serverSecret, err := hs.suite.deriveSecret(hs.masterSecret,
 		serverApplicationTrafficLabel, hs.transcript)
+	if err != nil {
+		return err
+	}
 	err = c.in.setTrafficSecret(hs.suite, serverSecret)
 	if err != nil {
 		return err
@@ -580,7 +614,10 @@ func (hs *clientHandshakeStateTLS13) readServerFinished() error {
 		return err
 	}
 
-	c.ekm = hs.suite.exportKeyingMaterial(hs.masterSecret, hs.transcript)
+	c.ekm, err = hs.suite.exportKeyingMaterial(hs.masterSecret, hs.transcript)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -675,8 +712,13 @@ func (hs *clientHandshakeStateTLS13) sendClientCertificate() error {
 func (hs *clientHandshakeStateTLS13) sendClientFinished() error {
 	c := hs.c
 
+	finHash, err := hs.suite.finishedHash(c.out.trafficSecret, hs.transcript)
+	if err != nil {
+		return err
+	}
+
 	finished := &finishedMsg{
-		verifyData: hs.suite.finishedHash(c.out.trafficSecret, hs.transcript),
+		verifyData: finHash,
 	}
 
 	resMursh, err := finished.marshal()
@@ -698,8 +740,11 @@ func (hs *clientHandshakeStateTLS13) sendClientFinished() error {
 	}
 
 	if !c.config.SessionTicketsDisabled && c.config.ClientSessionCache != nil {
-		c.resumptionSecret = hs.suite.deriveSecret(hs.masterSecret,
+		c.resumptionSecret, err = hs.suite.deriveSecret(hs.masterSecret,
 			resumptionLabel, hs.transcript)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

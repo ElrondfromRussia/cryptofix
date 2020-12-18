@@ -193,8 +193,10 @@ func (hc *halfConn) changeCipherSpec() error {
 
 func (hc *halfConn) setTrafficSecret(suite *cipherSuiteTLS13, secret []byte) error {
 	hc.trafficSecret = secret
-	key, iv := suite.trafficKey(secret)
-	var err error
+	key, iv, err := suite.trafficKey(secret)
+	if err != nil {
+		return err
+	}
 	hc.cipher, err = suite.aead(key, iv)
 	if err != nil {
 		return err
@@ -1243,8 +1245,11 @@ func (c *Conn) handleKeyUpdate(keyUpdate *keyUpdateMsg) error {
 		return c.in.setErrorLocked(c.sendAlert(alertInternalError))
 	}
 
-	newSecret := cipherSuite.nextTrafficSecret(c.in.trafficSecret)
-	err := c.in.setTrafficSecret(cipherSuite, newSecret)
+	newSecret, err := cipherSuite.nextTrafficSecret(c.in.trafficSecret)
+	if err != nil {
+		return err
+	}
+	err = c.in.setTrafficSecret(cipherSuite, newSecret)
 	if err != nil {
 		return err
 	}
@@ -1267,7 +1272,10 @@ func (c *Conn) handleKeyUpdate(keyUpdate *keyUpdateMsg) error {
 			return nil
 		}
 
-		newSecret := cipherSuite.nextTrafficSecret(c.out.trafficSecret)
+		newSecret, err := cipherSuite.nextTrafficSecret(c.out.trafficSecret)
+		if err != nil {
+			return err
+		}
 		err = c.out.setTrafficSecret(cipherSuite, newSecret)
 		if err != nil {
 			return err

@@ -333,10 +333,19 @@ func (c *Conn) loadSession(hello *clientHelloMsg) (cacheKey string,
 	if err != nil {
 		return "", nil, nil, nil
 	}
-	psk := cipherSuite.expandLabel(session.masterSecret, "resumption",
+	psk, err := cipherSuite.expandLabel(session.masterSecret, "resumption",
 		session.nonce, hashSize)
-	earlySecret = cipherSuite.extract(psk, nil)
-	binderKey = cipherSuite.deriveSecret(earlySecret, resumptionBinderLabel, nil)
+	if err != nil {
+		return "", nil, nil, nil
+	}
+	earlySecret, err = cipherSuite.extract(psk, nil)
+	if err != nil {
+		return "", nil, nil, nil
+	}
+	binderKey, err = cipherSuite.deriveSecret(earlySecret, resumptionBinderLabel, nil)
+	if err != nil {
+		return "", nil, nil, nil
+	}
 
 	hashNew, err := cipherSuite.hash.New()
 	if err != nil {
@@ -348,7 +357,13 @@ func (c *Conn) loadSession(hello *clientHelloMsg) (cacheKey string,
 		return "", nil, nil, nil
 	}
 	transcript.Write(helloMursh)
-	pskBinders := [][]byte{cipherSuite.finishedHash(binderKey, transcript)}
+
+	finHasg, err := cipherSuite.finishedHash(binderKey, transcript)
+	if err != nil {
+		return "", nil, nil, nil
+	}
+
+	pskBinders := [][]byte{finHasg}
 	//TODO: think, not sure about that
 	hello.updateBinders(pskBinders)
 
