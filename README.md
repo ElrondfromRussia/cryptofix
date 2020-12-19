@@ -4,3 +4,6 @@ import:
 ```
 import "github.com/ElrondfromRussia/cryptofix"
 ```
+
+# NOW
+conflict with standart http lib, proj's frozen
